@@ -9,6 +9,7 @@ interface HomeAssistant {
   services: { [domain: string]: { [service: string]: any } };
   callService: (domain: string, service: string, data?: any) => Promise<any>;
   config: any;
+  locale?: { language: string };
 }
 
 interface HeizplanCardConfig {
@@ -17,37 +18,86 @@ interface HeizplanCardConfig {
   min_temp?: number;
   max_temp?: number;
   temp_step?: number;
-  schedule?: Schedule;
+  schedule?: LegacySchedule;
   schedule_entity?: string;
   room_temp_key?: string;
+  persistence?: PersistenceConfig;
+  debug?: boolean;
 }
 
 interface ScheduleEntry {
   start: string;
   stop: string;
+  temperatures: Record<string, number>;
+}
+
+type Schedule = Record<string, ScheduleEntry[]>;
+
+interface LegacyScheduleEntry {
+  start: string;
+  stop: string;
   temperature: number;
 }
 
-interface Schedule {
-  [day: string]: ScheduleEntry[];
-}
+type LegacySchedule = Record<string, LegacyScheduleEntry[]>;
 
 interface EditingBlock {
   day: string;
   index: number;
-  entry: ScheduleEntry;
+  start: string;
+  stop: string;
+  temperature: number;
+}
+
+interface PersistenceConfig {
+  domain: string;
+  service: string;
+  include_entity?: boolean;
+  schedule_key?: string;
+  data?: Record<string, unknown>;
 }
 
 @customElement('heizplan-card-v2')
 export class HeizplanCardV2 extends LitElement {
-  @property({ attribute: false }) public hass!: HomeAssistant;
-  @property({ type: Object }) public config!: HeizplanCardConfig;
+  private _hass?: HomeAssistant;
+  private _config!: HeizplanCardConfig;
+
+  @property({ attribute: false })
+  public get hass(): HomeAssistant {
+    return this._hass as HomeAssistant;
+  }
+
+  public set hass(value: HomeAssistant) {
+    const oldValue = this._hass;
+    this._hass = value;
+    this.requestUpdate('hass', oldValue);
+    if (value && this._config?.schedule_entity) {
+      this._maybeLoadScheduleFromHA(value);
+    }
+  }
+
+  @property({ type: Object })
+  public get config(): HeizplanCardConfig {
+    return this._config;
+  }
+
+  public set config(value: HeizplanCardConfig) {
+    const oldValue = this._config;
+    this._config = value;
+    this.requestUpdate('config', oldValue);
+  }
 
   @state() private _schedule: Schedule = {};
   @state() private _currentView: 'single' | 'week' = 'single';
   @state() private _currentDay: string = this._getCurrentDay();
   @state() private _editingBlock: EditingBlock | null = null;
-  @state() private _errorMessage: string = '';
+  @state() private _errorMessage = '';
+  @state() private _selectedRoom: string | null = null;
+  @state() private _availableRooms: string[] = [];
+  @state() private _isPersisting = false;
+
+  private _lastKnownSchedule: Schedule | null = null;
+  private _lastScheduleFingerprint: string | null = null;
 
   static get styles(): CSSResultGroup {
     return css`
@@ -69,9 +119,49 @@ export class HeizplanCardV2 extends LitElement {
         font-weight: bold;
       }
 
+      .title-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
       .current-temp {
         font-size: 1rem;
         color: var(--secondary-text-color, #aaa);
+      }
+
+      .room-selector {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.25rem;
+        font-size: 0.8rem;
+        color: var(--secondary-text-color, #aaa);
+      }
+
+      .room-selector label {
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .room-selector span {
+        font-size: 1rem;
+        color: var(--primary-text-color, #fff);
+      }
+
+      .room-selector select {
+        background: var(--ha-card-background, rgba(255, 255, 255, 0.08));
+        color: var(--primary-text-color, #fff);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        min-width: 8rem;
+      }
+
+      .room-selector select:focus-visible {
+        outline: 2px solid var(--primary-color, #f39c12);
+        outline-offset: 1px;
       }
 
       /* View Controls */
@@ -96,6 +186,11 @@ export class HeizplanCardV2 extends LitElement {
       .view-button:hover {
         background: var(--primary-color, #f39c12);
         color: white;
+      }
+
+      .view-button:focus-visible {
+        outline: 2px solid var(--primary-color, #f39c12);
+        outline-offset: 2px;
       }
 
       .view-button.active {
@@ -201,14 +296,6 @@ export class HeizplanCardV2 extends LitElement {
       .week-timeline .time-block:hover {
         transform: scaleY(1.1);
       }
-
-      /* Temperature Colors */
-      .temp-5 { background-color: var(--temp-cold-color, #175e7f); }
-      .temp-17 { background-color: var(--temp-medium-color, #f39c12); }
-      .temp-19 { background-color: var(--temp-warm-color, #e74c3c); }
-      .temp-20 { background-color: var(--temp-warm-color, #e67e22); }
-      .temp-21 { background-color: var(--temp-hot-color, #c0392b); }
-      .temp-21-5 { background-color: var(--temp-very-hot-color, #a93226); }
 
       /* Time Markers */
       .time-markers {
@@ -336,6 +423,13 @@ export class HeizplanCardV2 extends LitElement {
         text-align: center;
       }
 
+      .status-message {
+        color: var(--secondary-text-color, #aaa);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        text-align: center;
+      }
+
       /* Edit Modal */
       .edit-modal {
         position: fixed;
@@ -400,105 +494,243 @@ export class HeizplanCardV2 extends LitElement {
     `;
   }
 
+  public setConfig(config: HeizplanCardConfig): void {
+    if (!config?.entity) {
+      throw new Error('You must define a climate entity in the card configuration.');
+    }
+
+    const normalizedPersistence = config.persistence
+      ? {
+          domain: config.persistence.domain,
+          service: config.persistence.service,
+          include_entity: config.persistence.include_entity ?? true,
+          schedule_key: config.persistence.schedule_key ?? 'schedule',
+          data: config.persistence.data ?? {}
+        }
+      : undefined;
+
+    if (normalizedPersistence && (!normalizedPersistence.domain || !normalizedPersistence.service)) {
+      throw new Error('Persistence configuration must specify both a domain and a service.');
+    }
+
+    const normalizedConfig: HeizplanCardConfig = {
+      ...config,
+      name: config.name ?? 'Heizplan',
+      min_temp: config.min_temp ?? 5,
+      max_temp: config.max_temp ?? 30,
+      temp_step: config.temp_step ?? 0.5,
+      persistence: normalizedPersistence
+    };
+
+    this.config = normalizedConfig;
+    this._currentDay = this._getCurrentDay();
+    this._errorMessage = '';
+
+    const initialSchedule = config.schedule
+      ? this._fromLegacySchedule(config.schedule, config.room_temp_key)
+      : this._getDefaultSchedule(config.room_temp_key);
+
+    if (Object.keys(initialSchedule).length > 0) {
+      this._applySchedule(initialSchedule);
+    }
+
+    if (!this._selectedRoom && this._availableRooms.length > 0) {
+      this._selectedRoom = this._availableRooms[0] ?? null;
+    }
+
+    if (this._hass && config.schedule_entity) {
+      this._maybeLoadScheduleFromHA(this._hass);
+    }
+  }
+
   private _getCurrentDay(): string {
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     return days[new Date().getDay()];
   }
 
-  private _getDefaultSchedule(): Schedule {
+  private _getDefaultSchedule(roomKey?: string): Schedule {
+    const key = roomKey ?? 'default_room';
+    const makeEntry = (start: string, stop: string, temperature: number): ScheduleEntry => ({
+      start,
+      stop,
+      temperatures: { [key]: temperature }
+    });
+
     return {
       monday: [
-        { start: '00:00', stop: '07:00', temperature: 5 },
-        { start: '07:00', stop: '09:30', temperature: 21 },
-        { start: '09:30', stop: '14:30', temperature: 21 },
-        { start: '14:30', stop: '21:00', temperature: 21 },
-        { start: '21:00', stop: '23:00', temperature: 21.5 },
-        { start: '23:00', stop: '24:00', temperature: 5 }
+        makeEntry('00:00', '07:00', 5),
+        makeEntry('07:00', '09:30', 21),
+        makeEntry('09:30', '14:30', 21),
+        makeEntry('14:30', '21:00', 21),
+        makeEntry('21:00', '23:00', 21.5),
+        makeEntry('23:00', '24:00', 5)
       ],
       tuesday: [
-        { start: '00:00', stop: '07:00', temperature: 5 },
-        { start: '07:00', stop: '09:30', temperature: 21 },
-        { start: '09:30', stop: '14:30', temperature: 21 },
-        { start: '14:30', stop: '21:00', temperature: 21 },
-        { start: '21:00', stop: '23:00', temperature: 21.5 },
-        { start: '23:00', stop: '24:00', temperature: 5 }
+        makeEntry('00:00', '07:00', 5),
+        makeEntry('07:00', '09:30', 21),
+        makeEntry('09:30', '14:30', 21),
+        makeEntry('14:30', '21:00', 21),
+        makeEntry('21:00', '23:00', 21.5),
+        makeEntry('23:00', '24:00', 5)
       ],
       wednesday: [
-        { start: '00:00', stop: '07:00', temperature: 5 },
-        { start: '07:00', stop: '09:30', temperature: 21 },
-        { start: '09:30', stop: '14:30', temperature: 21 },
-        { start: '14:30', stop: '21:00', temperature: 21 },
-        { start: '21:00', stop: '23:00', temperature: 21.5 },
-        { start: '23:00', stop: '24:00', temperature: 5 }
+        makeEntry('00:00', '07:00', 5),
+        makeEntry('07:00', '09:30', 21),
+        makeEntry('09:30', '14:30', 21),
+        makeEntry('14:30', '21:00', 21),
+        makeEntry('21:00', '23:00', 21.5),
+        makeEntry('23:00', '24:00', 5)
       ],
       thursday: [
-        { start: '00:00', stop: '07:00', temperature: 5 },
-        { start: '07:00', stop: '09:30', temperature: 21 },
-        { start: '09:30', stop: '14:30', temperature: 21 },
-        { start: '14:30', stop: '21:00', temperature: 21 },
-        { start: '21:00', stop: '23:00', temperature: 21.5 },
-        { start: '23:00', stop: '24:00', temperature: 5 }
+        makeEntry('00:00', '07:00', 5),
+        makeEntry('07:00', '09:30', 21),
+        makeEntry('09:30', '14:30', 21),
+        makeEntry('14:30', '21:00', 21),
+        makeEntry('21:00', '23:00', 21.5),
+        makeEntry('23:00', '24:00', 5)
       ],
       friday: [
-        { start: '00:00', stop: '07:00', temperature: 5 },
-        { start: '07:00', stop: '09:30', temperature: 21 },
-        { start: '09:30', stop: '14:30', temperature: 21 },
-        { start: '14:30', stop: '21:00', temperature: 21 },
-        { start: '21:00', stop: '23:00', temperature: 21 },
-        { start: '23:00', stop: '24:00', temperature: 5 }
+        makeEntry('00:00', '07:00', 5),
+        makeEntry('07:00', '09:30', 21),
+        makeEntry('09:30', '14:30', 21),
+        makeEntry('14:30', '21:00', 21),
+        makeEntry('21:00', '23:00', 21),
+        makeEntry('23:00', '24:00', 5)
       ],
       saturday: [
-        { start: '00:00', stop: '07:30', temperature: 5 },
-        { start: '07:30', stop: '10:30', temperature: 21 },
-        { start: '10:30', stop: '19:00', temperature: 21 },
-        { start: '19:00', stop: '23:00', temperature: 21.5 },
-        { start: '23:00', stop: '24:00', temperature: 5 }
+        makeEntry('00:00', '07:30', 5),
+        makeEntry('07:30', '10:30', 21),
+        makeEntry('10:30', '19:00', 21),
+        makeEntry('19:00', '23:00', 21.5),
+        makeEntry('23:00', '24:00', 5)
       ],
       sunday: [
-        { start: '00:00', stop: '07:30', temperature: 5 },
-        { start: '07:30', stop: '10:30', temperature: 21 },
-        { start: '10:30', stop: '19:00', temperature: 21 },
-        { start: '19:00', stop: '23:00', temperature: 21.5 },
-        { start: '23:00', stop: '24:00', temperature: 5 }
+        makeEntry('00:00', '07:30', 5),
+        makeEntry('07:30', '10:30', 21),
+        makeEntry('10:30', '19:00', 21),
+        makeEntry('19:00', '23:00', 21.5),
+        makeEntry('23:00', '24:00', 5)
       ]
     };
   }
 
-  connectedCallback() {
+  private _applySchedule(schedule: Schedule): void {
+    const mutable = this._createMutableSchedule(schedule);
+    this._schedule = mutable;
+    this._lastKnownSchedule = this._createMutableSchedule(schedule);
+    this._updateAvailableRoomsFromSchedule(mutable);
+  }
+
+  private _fromLegacySchedule(schedule: LegacySchedule, roomKey?: string): Schedule {
+    const key = roomKey ?? this._config?.room_temp_key ?? 'default_room';
+    const converted: Schedule = {};
+
+    Object.entries(schedule).forEach(([day, entries]) => {
+      if (!Array.isArray(entries)) {
+        return;
+      }
+
+      converted[day.toLowerCase()] = entries.map(entry => ({
+        start: String(entry.start),
+        stop: String(entry.stop),
+        temperatures: { [key]: Number(entry.temperature) }
+      }));
+    });
+
+    return converted;
+  }
+
+  private _updateAvailableRoomsFromSchedule(schedule: Schedule): void {
+    const rooms = new Set<string>();
+
+    Object.values(schedule).forEach(entries => {
+      entries?.forEach(entry => {
+        Object.keys(entry.temperatures || {}).forEach(room => {
+          if (room) {
+            rooms.add(room);
+          }
+        });
+      });
+    });
+
+    const sortedRooms = Array.from(rooms).sort();
+    this._availableRooms = sortedRooms;
+
+    if (sortedRooms.length === 0) {
+      this._selectedRoom = null;
+      return;
+    }
+
+    const preferred = this._config?.room_temp_key;
+    if (preferred && sortedRooms.includes(preferred)) {
+      this._selectedRoom = preferred;
+      return;
+    }
+
+    if (!this._selectedRoom || !sortedRooms.includes(this._selectedRoom)) {
+      this._selectedRoom = sortedRooms[0];
+    }
+  }
+
+  private _formatDayLabel(day: string, short = false): string {
+    const date = new Date();
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const index = days.indexOf(day.toLowerCase());
+
+    if (index !== -1) {
+      const baseDate = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay() + index);
+      const formatter = new Intl.DateTimeFormat(this._hass?.locale?.language ?? undefined, {
+        weekday: short ? 'short' : 'long'
+      });
+      return formatter.format(baseDate);
+    }
+
+    const normalized = day.charAt(0).toUpperCase() + day.slice(1);
+    return short ? normalized.slice(0, 2) : normalized;
+  }
+
+  private _formatRoomName(room: string): string {
+    return room
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  private _getTemperature(entry: ScheduleEntry, room: string | null = this._selectedRoom): number | null {
+    if (!room) {
+      return null;
+    }
+
+    const value = entry.temperatures?.[room];
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+      return value;
+    }
+
+    return null;
+  }
+
+  private _formatTemperature(value: number): string {
+    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  }
+
+  private _temperatureToColor(temp: number): string {
+    const min = this._config?.min_temp ?? 5;
+    const max = this._config?.max_temp ?? 30;
+    const safeSpan = Math.max(1, max - min);
+    const ratio = Math.min(1, Math.max(0, (temp - min) / safeSpan));
+
+    const cold = [23, 126, 199];
+    const hot = [234, 83, 48];
+
+    const r = Math.round(cold[0] + (hot[0] - cold[0]) * ratio);
+    const g = Math.round(cold[1] + (hot[1] - cold[1]) * ratio);
+    const b = Math.round(cold[2] + (hot[2] - cold[2]) * ratio);
+
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  connectedCallback(): void {
     super.connectedCallback();
     this._currentDay = this._getCurrentDay();
-    this._schedule = this._getDefaultSchedule();
-  }
-
-  setConfig(config: HeizplanCardConfig) {
-    if (!config.entity) {
-      throw new Error('Please define a thermostat entity');
-    }
-
-    this.config = {
-      name: 'Heizplan',
-      min_temp: 5,
-      max_temp: 30,
-      temp_step: 0.5,
-      room_temp_key: 'T_kueche',
-      ...config
-    };
-
-    // Use provided schedule or try to load from HA
-    if (config.schedule) {
-      this._schedule = this._createMutableSchedule(config.schedule);
-    } else {
-      this._schedule = this._getDefaultSchedule();
-    }
-  }
-
-  updated(changedProperties: Map<string | number | symbol, unknown>) {
-    super.updated(changedProperties);
-
-    // Auto-load schedule when hass becomes available
-    if (changedProperties.has('hass') && this.hass) {
-      this._loadScheduleFromHA();
-    }
   }
 
   getCardSize(): number {
@@ -513,15 +745,19 @@ export class HeizplanCardV2 extends LitElement {
   }
 
   render(): TemplateResult {
-    if (!this.hass || !this.config?.entity) {
-      return html`<div class="heizplan-card">Loading...</div>`;
+    if (!this._config?.entity) {
+      return html`<div class="heizplan-card">Card is not configured.</div>`;
     }
 
-    const entity = this.hass.states[this.config.entity];
+    if (!this._hass) {
+      return html`<div class="heizplan-card">Loading…</div>`;
+    }
+
+    const entity = this._hass.states[this._config.entity];
     if (!entity) {
       return html`
         <div class="heizplan-card">
-          <div class="error-message">Entity ${this.config.entity} not found</div>
+          <div class="error-message">Entity ${this._config.entity} not found</div>
         </div>
       `;
     }
@@ -543,8 +779,39 @@ export class HeizplanCardV2 extends LitElement {
   private _renderHeader(entity: any): TemplateResult {
     return html`
       <div class="card-header">
-        <div class="card-title">${this.config.name}</div>
-        <div class="current-temp">${entity.attributes.current_temperature || '--'}°C</div>
+        <div class="title-stack">
+          <div class="card-title">${this._config.name}</div>
+          <div class="current-temp">${entity.attributes.current_temperature ?? '--'}°C</div>
+        </div>
+        ${this._renderRoomSelector()}
+      </div>
+    `;
+  }
+
+  private _renderRoomSelector(): TemplateResult {
+    if (this._availableRooms.length === 0) {
+      return html``;
+    }
+
+    if (this._availableRooms.length === 1) {
+      return html`
+        <div class="room-selector" role="presentation">
+          <label>Room</label>
+          <span>${this._formatRoomName(this._availableRooms[0])}</span>
+        </div>
+      `;
+    }
+
+    const selectId = `room-select-${this._config.entity.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+
+    return html`
+      <div class="room-selector">
+        <label for=${selectId}>Room</label>
+        <select id=${selectId} @change=${this._handleRoomChange}>
+          ${this._availableRooms.map(
+            room => html`<option value=${room} ?selected=${room === this._selectedRoom}>${this._formatRoomName(room)}</option>`
+          )}
+        </select>
       </div>
     `;
   }
@@ -578,12 +845,20 @@ export class HeizplanCardV2 extends LitElement {
 
   private _renderSingleDayView(): TemplateResult {
     const daySchedule = this._schedule[this._currentDay] || [];
+    const dayLabel = this._formatDayLabel(this._currentDay);
+
+    if (!this._selectedRoom) {
+      return html`
+        <div class="schedule-container">
+          <div class="day-header">${dayLabel}</div>
+          <div class="status-message">No rooms available in the schedule.</div>
+        </div>
+      `;
+    }
 
     return html`
       <div class="schedule-container">
-        <div class="day-header">
-          ${this._currentDay.charAt(0).toUpperCase() + this._currentDay.slice(1)}
-        </div>
+        <div class="day-header">${dayLabel}</div>
         <div class="timeline" @click=${this._handleTimelineClick}>
           ${daySchedule.map((entry, index) => this._renderTimeBlock(entry, index))}
         </div>
@@ -600,13 +875,13 @@ export class HeizplanCardV2 extends LitElement {
 
   private _renderWeekView(): TemplateResult {
     const days = [
-      { key: 'monday', label: 'Mo' },
-      { key: 'tuesday', label: 'Di' },
-      { key: 'wednesday', label: 'Mi' },
-      { key: 'thursday', label: 'Do' },
-      { key: 'friday', label: 'Fr' },
-      { key: 'saturday', label: 'Sa' },
-      { key: 'sunday', label: 'So' }
+      { key: 'monday', label: this._formatDayLabel('monday', true) },
+      { key: 'tuesday', label: this._formatDayLabel('tuesday', true) },
+      { key: 'wednesday', label: this._formatDayLabel('wednesday', true) },
+      { key: 'thursday', label: this._formatDayLabel('thursday', true) },
+      { key: 'friday', label: this._formatDayLabel('friday', true) },
+      { key: 'saturday', label: this._formatDayLabel('saturday', true) },
+      { key: 'sunday', label: this._formatDayLabel('sunday', true) }
     ];
 
     return html`
@@ -640,39 +915,51 @@ export class HeizplanCardV2 extends LitElement {
 
   private _renderTimeBlock(entry: ScheduleEntry, index: number): TemplateResult {
     const { widthPercentage, leftPercentage, durationMinutes } = this._calculateTimeBlockDimensions(entry);
-    const tempClass = `temp-${entry.temperature.toString().replace('.', '-')}`;
+    const temp = this._getTemperature(entry);
+    const displayTemp = temp !== null ? `${this._formatTemperature(temp)}°C` : '';
+    const backgroundColor = temp !== null
+      ? this._temperatureToColor(temp)
+      : 'var(--timeline-background, #2e2e2e)';
 
     return html`
       <div
-        class="time-block ${tempClass}"
+        class="time-block"
         style=${styleMap({
           width: `${widthPercentage}%`,
           left: `${leftPercentage}%`,
-          position: 'absolute'
+          position: 'absolute',
+          background: backgroundColor
         })}
         data-index=${index}
+        aria-label=${`Setpoint ${displayTemp || 'not set'} from ${entry.start} to ${entry.stop}`}
       >
-        ${durationMinutes > 90 ? `${entry.temperature}°C` : ''}
+        ${durationMinutes > 90 ? displayTemp : ''}
       </div>
     `;
   }
 
   private _renderWeekTimeBlock(entry: ScheduleEntry, index: number, day: string): TemplateResult {
     const { widthPercentage, leftPercentage, durationMinutes } = this._calculateTimeBlockDimensions(entry);
-    const tempClass = `temp-${entry.temperature.toString().replace('.', '-')}`;
+    const temp = this._getTemperature(entry);
+    const displayTemp = temp !== null ? `${this._formatTemperature(temp)}°` : '';
+    const backgroundColor = temp !== null
+      ? this._temperatureToColor(temp)
+      : 'var(--timeline-background, #2e2e2e)';
 
     return html`
       <div
-        class="time-block ${tempClass}"
+        class="time-block"
         style=${styleMap({
           width: `${widthPercentage}%`,
           left: `${leftPercentage}%`,
-          position: 'absolute'
+          position: 'absolute',
+          background: backgroundColor
         })}
         data-index=${index}
         data-day=${day}
+        aria-label=${`Setpoint ${displayTemp || 'not set'} on ${day} from ${entry.start} to ${entry.stop}`}
       >
-        ${durationMinutes > 120 ? `${entry.temperature}°` : ''}
+        ${durationMinutes > 120 ? displayTemp : ''}
       </div>
     `;
   }
@@ -707,9 +994,17 @@ export class HeizplanCardV2 extends LitElement {
   }
 
   private _renderErrorMessage(): TemplateResult {
-    return this._errorMessage
-      ? html`<div class="error-message">${this._errorMessage}</div>`
-      : html``;
+    const messages: TemplateResult[] = [];
+
+    if (this._isPersisting) {
+      messages.push(html`<div class="status-message" role="status">Saving schedule…</div>`);
+    }
+
+    if (this._errorMessage) {
+      messages.push(html`<div class="error-message" role="alert">${this._errorMessage}</div>`);
+    }
+
+    return html`${messages}`;
   }
 
   private _renderEditModal(): TemplateResult {
@@ -717,21 +1012,26 @@ export class HeizplanCardV2 extends LitElement {
       return html``;
     }
 
-    const { entry } = this._editingBlock;
+    const { start, stop, temperature } = this._editingBlock;
+    const roomLabel = this._selectedRoom ? this._formatRoomName(this._selectedRoom) : '';
 
     return html`
       <div class="edit-modal" @click=${this._handleModalBackdropClick}>
         <div class="edit-modal-content">
-          <h3>Edit Temperature</h3>
-          <p class="edit-time-range">${entry.start} - ${entry.stop}</p>
+          <h3>Edit ${roomLabel ? `${roomLabel} ` : ''}Temperature</h3>
+          <p class="edit-time-range">${start} - ${stop}</p>
           <div class="edit-controls">
             <button class="temp-button decrease" @click=${this._decreaseEditTemp}>−</button>
-            <div class="temp-display edit-temp">${entry.temperature}°C</div>
+            <div class="temp-display edit-temp">${this._formatTemperature(temperature)}°C</div>
             <button class="temp-button increase" @click=${this._increaseEditTemp}>+</button>
           </div>
           <div class="modal-buttons">
-            <button class="modal-button primary" @click=${this._saveEdit}>Save</button>
-            <button class="modal-button secondary" @click=${this._cancelEdit}>Cancel</button>
+            <button class="modal-button primary" @click=${this._saveEdit} ?disabled=${this._isPersisting}>
+              ${this._isPersisting ? 'Saving…' : 'Save'}
+            </button>
+            <button class="modal-button secondary" @click=${this._cancelEdit} ?disabled=${this._isPersisting}>
+              Cancel
+            </button>
           </div>
         </div>
       </div>
@@ -741,17 +1041,35 @@ export class HeizplanCardV2 extends LitElement {
   // Helper methods
   private _calculateTimeBlockDimensions(entry: ScheduleEntry) {
     const totalMinutes = 1440; // 24 hours
-    const startMinutes = this._timeToMinutes(entry.start);
-    const stopMinutes = this._timeToMinutes(entry.stop);
-    const widthPercentage = ((stopMinutes - startMinutes) / totalMinutes) * 100;
+    const startMinutes = Math.max(0, Math.min(totalMinutes, this._timeToMinutes(entry.start)));
+    const stopMinutes = Math.max(startMinutes, Math.min(totalMinutes, this._timeToMinutes(entry.stop)));
+    const durationMinutes = Math.max(0, stopMinutes - startMinutes);
+    const widthPercentage = (durationMinutes / totalMinutes) * 100;
     const leftPercentage = (startMinutes / totalMinutes) * 100;
-    const durationMinutes = stopMinutes - startMinutes;
 
     return { widthPercentage, leftPercentage, durationMinutes };
   }
 
   private _timeToMinutes(timeStr: string): number {
-    const [hours, minutes] = timeStr.split(':').map(Number);
+    if (!timeStr) {
+      return 0;
+    }
+
+    const [hoursStr, minutesStr] = timeStr.split(':');
+    let hours = Number(hoursStr);
+    let minutes = Number(minutesStr ?? '0');
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      return 0;
+    }
+
+    if (hours >= 24) {
+      return 1440;
+    }
+
+    minutes = Math.max(0, Math.min(59, minutes));
+    hours = Math.max(0, Math.min(23, hours));
+
     return hours * 60 + minutes;
   }
 
@@ -763,7 +1081,7 @@ export class HeizplanCardV2 extends LitElement {
         mutableSchedule[day] = schedule[day].map(entry => ({
           start: String(entry.start),
           stop: String(entry.stop),
-          temperature: Number(entry.temperature)
+          temperatures: { ...entry.temperatures }
         }));
       }
     });
@@ -776,47 +1094,50 @@ export class HeizplanCardV2 extends LitElement {
     this._currentView = viewType;
   }
 
+  private _handleRoomChange(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    const newRoom = select?.value;
+    if (!newRoom || newRoom === this._selectedRoom) {
+      return;
+    }
+
+    this._selectedRoom = newRoom;
+
+    if (this._editingBlock) {
+      const daySchedule = this._schedule[this._editingBlock.day] || [];
+      const entry = daySchedule[this._editingBlock.index];
+      const temperature = entry ? this._getTemperature(entry, newRoom) : null;
+
+      if (temperature === null) {
+        this._editingBlock = null;
+        this._errorMessage = `No setpoint defined for ${this._formatRoomName(newRoom)}.`;
+        return;
+      }
+
+      this._editingBlock = {
+        ...this._editingBlock,
+        start: entry.start,
+        stop: entry.stop,
+        temperature
+      };
+    }
+  }
+
   private _handleTimelineClick(e: Event) {
     const timeBlock = (e.target as Element).closest('.time-block') as HTMLElement;
     if (!timeBlock) return;
 
-    const index = parseInt(timeBlock.dataset.index || '0');
-    const daySchedule = this._schedule[this._currentDay] || [];
-    const entry = daySchedule[index];
-
-    if (!entry) return;
-
-    this._editingBlock = {
-      day: this._currentDay,
-      index,
-      entry: {
-        start: entry.start,
-        stop: entry.stop,
-        temperature: Number(entry.temperature)
-      }
-    };
+    const index = parseInt(timeBlock.dataset.index || '0', 10);
+    this._openEditingBlock(this._currentDay, index);
   }
 
   private _handleWeekTimelineClick(e: Event) {
     const timeBlock = (e.target as Element).closest('.time-block') as HTMLElement;
     if (!timeBlock) return;
 
-    const index = parseInt(timeBlock.dataset.index || '0');
+    const index = parseInt(timeBlock.dataset.index || '0', 10);
     const day = timeBlock.dataset.day || '';
-    const daySchedule = this._schedule[day] || [];
-    const entry = daySchedule[index];
-
-    if (!entry) return;
-
-    this._editingBlock = {
-      day: day,
-      index,
-      entry: {
-        start: entry.start,
-        stop: entry.stop,
-        temperature: Number(entry.temperature)
-      }
-    };
+    this._openEditingBlock(day, index);
   }
 
   private _handleModalBackdropClick(e: Event) {
@@ -825,51 +1146,96 @@ export class HeizplanCardV2 extends LitElement {
     }
   }
 
+  private _openEditingBlock(day: string, index: number) {
+    if (!this._selectedRoom) {
+      this._errorMessage = 'Select a room to edit its schedule.';
+      return;
+    }
+
+    const daySchedule = this._schedule[day] || [];
+    const entry = daySchedule[index];
+
+    if (!entry) {
+      return;
+    }
+
+    const temperature = this._getTemperature(entry, this._selectedRoom);
+
+    if (temperature === null) {
+      this._errorMessage = `No setpoint defined for ${this._formatRoomName(this._selectedRoom)} on ${this._formatDayLabel(day)}.`;
+      return;
+    }
+
+    this._editingBlock = {
+      day,
+      index,
+      start: entry.start,
+      stop: entry.stop,
+      temperature
+    };
+    this._errorMessage = '';
+  }
+
   private _increaseTemperature() {
-    this._adjustTemperature(this.config.temp_step || 0.5);
+    this._adjustTemperature(this._config.temp_step || 0.5);
   }
 
   private _decreaseTemperature() {
-    this._adjustTemperature(-(this.config.temp_step || 0.5));
+    this._adjustTemperature(-(this._config.temp_step || 0.5));
   }
 
   private _increaseEditTemp() {
-    if (this._editingBlock) {
-      const newTemp = this._editingBlock.entry.temperature + (this.config.temp_step || 0.5);
-      const clampedTemp = Math.max(this.config.min_temp || 5,
-                         Math.min(this.config.max_temp || 30, newTemp));
-      this._editingBlock.entry.temperature = clampedTemp;
-      this.requestUpdate();
+    if (!this._editingBlock) {
+      return;
     }
+
+    const step = this._config.temp_step ?? 0.5;
+    const max = this._config.max_temp ?? 30;
+    const min = this._config.min_temp ?? 5;
+    const newTemp = Math.min(max, this._editingBlock.temperature + step);
+    const clampedTemp = Math.max(min, newTemp);
+
+    this._editingBlock = {
+      ...this._editingBlock,
+      temperature: Number(clampedTemp.toFixed(2))
+    };
   }
 
   private _decreaseEditTemp() {
-    if (this._editingBlock) {
-      const newTemp = this._editingBlock.entry.temperature - (this.config.temp_step || 0.5);
-      const clampedTemp = Math.max(this.config.min_temp || 5,
-                         Math.min(this.config.max_temp || 30, newTemp));
-      this._editingBlock.entry.temperature = clampedTemp;
-      this.requestUpdate();
+    if (!this._editingBlock) {
+      return;
     }
+
+    const step = this._config.temp_step ?? 0.5;
+    const max = this._config.max_temp ?? 30;
+    const min = this._config.min_temp ?? 5;
+    const newTemp = Math.max(min, this._editingBlock.temperature - step);
+    const clampedTemp = Math.min(max, newTemp);
+
+    this._editingBlock = {
+      ...this._editingBlock,
+      temperature: Number(clampedTemp.toFixed(2))
+    };
   }
 
   private _adjustTemperature(delta: number) {
-    if (!this.hass || !this.config.entity) return;
+    if (!this._hass || !this._config.entity) return;
 
-    const entity = this.hass.states[this.config.entity];
-    const currentTemp = entity.attributes.temperature || 20;
+    const entity = this._hass.states[this._config.entity];
+    const currentTemp = entity?.attributes?.temperature ?? 20;
+    const min = this._config.min_temp ?? 5;
+    const max = this._config.max_temp ?? 30;
     const newTemp = currentTemp + delta;
-    const clampedTemp = Math.max(this.config.min_temp || 5,
-                       Math.min(this.config.max_temp || 30, newTemp));
+    const clampedTemp = Math.max(min, Math.min(max, newTemp));
 
     this._setThermostatTemperature(clampedTemp);
   }
 
   private _setThermostatTemperature(temperature: number) {
-    if (!this.hass) return;
+    if (!this._hass) return;
 
-    this.hass.callService('climate', 'set_temperature', {
-      entity_id: this.config.entity,
+    this._hass.callService('climate', 'set_temperature', {
+      entity_id: this._config.entity,
       temperature: temperature
     }).catch((error: any) => {
       this._errorMessage = `Failed to set temperature: ${error.message}`;
@@ -877,9 +1243,9 @@ export class HeizplanCardV2 extends LitElement {
   }
 
   private _cycleHvacMode() {
-    if (!this.hass || !this.config.entity) return;
+    if (!this._hass || !this._config.entity) return;
 
-    const entity = this.hass.states[this.config.entity];
+    const entity = this._hass.states[this._config.entity];
     const availableModes = entity.attributes.hvac_modes || ['off', 'heat', 'auto'];
     const currentMode = entity.state;
 
@@ -889,8 +1255,8 @@ export class HeizplanCardV2 extends LitElement {
     const nextIndex = (currentIndex + 1) % availableModes.length;
     const nextMode = availableModes[nextIndex];
 
-    this.hass.callService('climate', 'set_hvac_mode', {
-      entity_id: this.config.entity,
+    this._hass.callService('climate', 'set_hvac_mode', {
+      entity_id: this._config.entity,
       hvac_mode: nextMode
     }).catch((error: any) => {
       this._errorMessage = `Failed to set HVAC mode: ${error.message}`;
@@ -898,45 +1264,62 @@ export class HeizplanCardV2 extends LitElement {
   }
 
   private _toggleHeatMode() {
-    if (!this.hass || !this.config.entity) return;
+    if (!this._hass || !this._config.entity) return;
 
-    const entity = this.hass.states[this.config.entity];
+    const entity = this._hass.states[this._config.entity];
     const currentMode = entity.state;
     const newMode = (currentMode === 'off') ? 'heat' : 'off';
 
-    this.hass.callService('climate', 'set_hvac_mode', {
-      entity_id: this.config.entity,
+    this._hass.callService('climate', 'set_hvac_mode', {
+      entity_id: this._config.entity,
       hvac_mode: newMode
     }).catch((error: any) => {
       this._errorMessage = `Failed to toggle HVAC mode: ${error.message}`;
     });
   }
 
-  private _saveEdit() {
-    if (!this._editingBlock) return;
-
-    const { day, index, entry } = this._editingBlock;
-
-    // Create a deep copy to avoid mutation issues
-    if (!this._schedule[day]) {
-      this._schedule[day] = [];
+  private async _saveEdit() {
+    if (!this._editingBlock || !this._selectedRoom) {
+      return;
     }
 
-    this._schedule[day][index] = {
-      start: entry.start,
-      stop: entry.stop,
-      temperature: entry.temperature
+    const { day, index, start, stop, temperature } = this._editingBlock;
+    const daySchedule = this._schedule[day] || [];
+    const existingEntry = daySchedule[index];
+
+    if (!existingEntry) {
+      return;
+    }
+
+    const updatedEntry: ScheduleEntry = {
+      start,
+      stop,
+      temperatures: {
+        ...existingEntry.temperatures,
+        [this._selectedRoom]: temperature
+      }
     };
 
-    // Trigger re-render
-    this.requestUpdate();
+    const updatedDay = [...daySchedule];
+    updatedDay[index] = updatedEntry;
 
-    // Close modal
-    this._cancelEdit();
+    this._schedule = {
+      ...this._schedule,
+      [day]: updatedDay
+    };
 
-    // Optionally trigger immediate temperature change
-    if (this._isCurrentTimeBlock(entry)) {
-      this._setThermostatTemperature(entry.temperature);
+    this._lastKnownSchedule = this._createMutableSchedule(this._schedule);
+
+    const shouldUpdateThermostat = this._isCurrentTimeBlock(updatedEntry);
+
+    const saved = await this._persistSchedule();
+
+    if (saved && shouldUpdateThermostat) {
+      this._setThermostatTemperature(temperature);
+    }
+
+    if (saved) {
+      this._cancelEdit();
     }
   }
 
@@ -949,44 +1332,264 @@ export class HeizplanCardV2 extends LitElement {
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const startMinutes = this._timeToMinutes(entry.start);
     const stopMinutes = this._timeToMinutes(entry.stop);
+    const effectiveStop = Math.max(startMinutes + 1, stopMinutes);
 
-    return currentMinutes >= startMinutes && currentMinutes < stopMinutes;
+    return currentMinutes >= startMinutes && currentMinutes < effectiveStop;
   }
 
-  private _loadScheduleFromHA() {
-    if (!this.hass || !this.config.schedule_entity) return;
+  private _maybeLoadScheduleFromHA(hass: HomeAssistant): void {
+    if (!this._config?.schedule_entity) {
+      return;
+    }
 
-    // Try to load schedule from HA entity (simplified version)
-    const scheduleEntity = this.hass.states[this.config.schedule_entity];
-    if (scheduleEntity && scheduleEntity.attributes) {
-      try {
-        const convertedSchedule = this._convertHAScheduleFormat(
-          scheduleEntity.attributes,
-          this.config.room_temp_key || 'T_kueche'
-        );
-        if (Object.keys(convertedSchedule).length > 0) {
-          this._schedule = convertedSchedule;
-        }
-      } catch (error) {
-        console.warn('Failed to load schedule from HA:', error);
+    const scheduleEntity = hass.states[this._config.schedule_entity];
+    if (!scheduleEntity) {
+      this._errorMessage = `Schedule entity ${this._config.schedule_entity} not found.`;
+      return;
+    }
+
+    const sourceAttributes =
+      typeof scheduleEntity.attributes?.data === 'object' && scheduleEntity.attributes?.data !== null
+        ? scheduleEntity.attributes.data
+        : scheduleEntity.attributes;
+
+    if (!sourceAttributes || typeof sourceAttributes !== 'object') {
+      this._debug('Schedule entity attributes not in expected format.', scheduleEntity.attributes);
+      return;
+    }
+
+    const fingerprint = JSON.stringify(sourceAttributes);
+    if (fingerprint === this._lastScheduleFingerprint) {
+      return;
+    }
+
+    try {
+      const converted = this._convertHAScheduleFormat(sourceAttributes);
+      if (Object.keys(converted).length === 0) {
+        this._debug('Converted schedule was empty; skipping update.');
+        return;
+      }
+
+      this._applySchedule(converted);
+      this._lastScheduleFingerprint = fingerprint;
+      this._errorMessage = '';
+    } catch (error) {
+      this._errorMessage = 'Failed to parse schedule from Home Assistant.';
+      this._debug('Schedule parsing failed', error);
+      if (this._lastKnownSchedule) {
+        this._schedule = this._createMutableSchedule(this._lastKnownSchedule);
       }
     }
   }
 
-  private _convertHAScheduleFormat(haSchedule: any, roomKey: string = 'T_kueche'): Schedule {
-    const convertedSchedule: Schedule = {};
+  private _convertHAScheduleFormat(haSchedule: any): Schedule {
+    const converted: Schedule = {};
+    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-    Object.keys(haSchedule).forEach(day => {
-      if (Array.isArray(haSchedule[day])) {
-        convertedSchedule[day] = haSchedule[day].map((period: any) => ({
-          start: period.from.substring(0, 5), // Convert "07:00:00" to "07:00"
-          stop: period.to.substring(0, 5),
-          temperature: period.data[roomKey] || 21 // Extract temp for specific room
-        }));
+    dayNames.forEach(day => {
+      const periods = haSchedule?.[day];
+      if (!Array.isArray(periods)) {
+        return;
+      }
+
+      const convertedPeriods = periods
+        .map((period: any) => this._convertHAPeriod(period))
+        .filter((entry): entry is ScheduleEntry => entry !== null);
+
+      if (convertedPeriods.length > 0) {
+        converted[day] = convertedPeriods;
       }
     });
 
-    return convertedSchedule;
+    return converted;
+  }
+
+  private _convertHAPeriod(period: any): ScheduleEntry | null {
+    if (!period || typeof period !== 'object') {
+      return null;
+    }
+
+    const start = this._normalizeTime(period.from ?? period.start);
+    const stop = this._normalizeTime(period.to ?? period.end ?? period.stop);
+
+    if (!start || !stop) {
+      return null;
+    }
+
+    const temperatures = this._normalizeTemperatures(period.data ?? period.temperatures ?? {});
+
+    if (Object.keys(temperatures).length === 0) {
+      const fallback = Number(period.temperature ?? period.setpoint);
+      if (!Number.isNaN(fallback)) {
+        const room = this._config?.room_temp_key ?? 'default_room';
+        temperatures[room] = fallback;
+      }
+    }
+
+    if (Object.keys(temperatures).length === 0) {
+      return null;
+    }
+
+    return {
+      start,
+      stop,
+      temperatures
+    };
+  }
+
+  private _normalizeTime(value: unknown): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+      const minutes = Math.round(value);
+      const clamped = Math.max(0, Math.min(1440, minutes));
+      const hours = Math.min(24, Math.floor(clamped / 60));
+      const mins = clamped % 60;
+      if (hours === 24 && mins > 0) {
+        return '24:00';
+      }
+      return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (timeMatch) {
+        let hours = Number(timeMatch[1]);
+        let minutes = Number(timeMatch[2]);
+        const seconds = Number(timeMatch[3] ?? 0);
+
+        if (hours === 24 && minutes === 0) {
+          return '24:00';
+        }
+
+        if (hours === 23 && minutes === 59 && seconds >= 59) {
+          return '24:00';
+        }
+
+        if (seconds >= 30) {
+          minutes += 1;
+        }
+
+        hours = Math.max(0, Math.min(24, hours));
+
+        if (minutes >= 60) {
+          hours = Math.min(24, hours + Math.floor(minutes / 60));
+          minutes %= 60;
+        }
+
+        if (hours === 24) {
+          return '24:00';
+        }
+
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      }
+
+      const isoMatch = trimmed.match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
+      if (isoMatch) {
+        return this._normalizeTime(`${isoMatch[1]}:${isoMatch[2]}:${isoMatch[3] ?? '00'}`);
+      }
+    }
+
+    return null;
+  }
+
+  private _normalizeTemperatures(data: any): Record<string, number> {
+    if (!data || typeof data !== 'object') {
+      return {};
+    }
+
+    const result: Record<string, number> = {};
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (!key) {
+        return;
+      }
+
+      const numericValue = typeof value === 'string' ? Number(value) : value;
+      if (typeof numericValue === 'number' && !Number.isNaN(numericValue)) {
+        result[key] = numericValue;
+      }
+    });
+
+    return result;
+  }
+
+  private _convertScheduleToHAFormat(schedule: Schedule): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+
+    Object.entries(schedule).forEach(([day, entries]) => {
+      result[day] = entries.map(entry => ({
+        from: this._toHaTime(entry.start),
+        to: this._toHaTime(entry.stop),
+        data: { ...entry.temperatures }
+      }));
+    });
+
+    return result;
+  }
+
+  private _toHaTime(time: string): string {
+    if (!time) {
+      return '00:00:00';
+    }
+
+    if (time === '24:00') {
+      return '24:00:00';
+    }
+
+    const [hours = '00', minutes = '00'] = time.split(':');
+    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+  }
+
+  private async _persistSchedule(): Promise<boolean> {
+    if (!this._config?.persistence) {
+      this._debug('No persistence configuration provided; skipping save.');
+      return true;
+    }
+
+    if (!this._hass) {
+      this._errorMessage = 'Unable to save schedule: Home Assistant connection unavailable.';
+      return false;
+    }
+
+    const { domain, service, include_entity, schedule_key, data } = this._config.persistence;
+    const payload: Record<string, unknown> = { ...(data ?? {}) };
+
+    if (include_entity !== false) {
+      if (this._config.schedule_entity) {
+        payload.entity_id = this._config.schedule_entity;
+      } else {
+        this._debug('include_entity is enabled but no schedule_entity was provided in the config.');
+      }
+    }
+
+    const key = schedule_key ?? 'schedule';
+    payload[key] = this._convertScheduleToHAFormat(this._schedule);
+
+    this._isPersisting = true;
+
+    try {
+      await this._hass.callService(domain, service, payload);
+      return true;
+    } catch (error: any) {
+      this._errorMessage = `Failed to save schedule: ${error?.message ?? error}`;
+      this._debug('Error while saving schedule', error);
+      return false;
+    } finally {
+      this._isPersisting = false;
+    }
+  }
+
+  private _debug(message: string, ...optionalParams: unknown[]): void {
+    if (!this._config?.debug) {
+      return;
+    }
+
+    // eslint-disable-next-line no-console
+    console.debug('[heizplan-card]', message, ...optionalParams);
   }
 }
 
