@@ -1,0 +1,38 @@
+{
+  "name": "heizplan-card",
+  "version": "2.0.0",
+  "description": "Interactive thermostat schedule card for Home Assistant",
+  "type": "module",
+  "main": "dist/heizplan-card-v2.js",
+  "scripts": {
+    "build": "tsc && rollup -c",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/heizplan-card.git"
+  },
+  "keywords": [
+    "home-assistant",
+    "thermostat",
+    "schedule",
+    "heating",
+    "lovelace",
+    "card"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "lit": "^3.0.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "@rollup/plugin-terser": "^0.4.0",
+    "rollup": "^4.0.0",
+    "tslib": "^2.0.0",
+    "typescript": "^5.0.0"
+  }
+}
