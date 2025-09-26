@@ -551,9 +551,15 @@ export class HeizplanCardV2 extends LitElement {
     const { domain, service } = persistence;
     const serviceKey = `${domain}.${service}`;
 
+    // Allow input_number.set_value since we handle it specially with individual temperature values
+    if (domain === 'input_number' && service === 'set_value') {
+      this._debug(`Using input_number.set_value - will save individual temperature values instead of full schedule`);
+      return;
+    }
+
     if (this._isNumericPersistenceTarget(domain, service)) {
       throw new Error(
-        `Persistence target ${serviceKey} only supports numeric payloads. Please choose a text/JSON capable helper such as input_text.set_value or variable.set_variable.`,
+        `Persistence target ${serviceKey} only supports numeric payloads. Please choose a text/JSON capable helper such as input_text.set_value or variable.set_variable, or use input_number.set_value for individual temperature persistence.`,
       );
     }
   }
@@ -1358,7 +1364,13 @@ export class HeizplanCardV2 extends LitElement {
 
     const shouldUpdateThermostat = this._isCurrentTimeBlock(updatedEntry);
 
-    const saved = await this._persistSchedule();
+    // Use the appropriate persistence method based on configuration
+    let saved;
+    if (this._config?.persistence?.domain === 'input_number') {
+      saved = await this._persistInputNumberValue(temperature, day, index);
+    } else {
+      saved = await this._persistSchedule();
+    }
 
     if (saved && shouldUpdateThermostat) {
       this._setThermostatTemperature(temperature);
@@ -1755,7 +1767,8 @@ export class HeizplanCardV2 extends LitElement {
     const { domain, service } = this._config.persistence;
     const serviceKey = `${domain}.${service}`;
 
-    if (this._isNumericPersistenceTarget(domain, service)) {
+    // Allow input_number.set_value since we handle it specially with individual temperature values
+    if (this._isNumericPersistenceTarget(domain, service) && !(domain === 'input_number' && service === 'set_value')) {
       this._errorMessage = `Cannot persist schedule: ${serviceKey} only accepts numeric payloads. Please switch to a text/JSON helper such as input_text.set_value.`;
       this._debug(`Skipping persistence because ${serviceKey} only accepts numeric payloads.`);
       return false;
