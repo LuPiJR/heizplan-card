@@ -1,0 +1,149 @@
+# =============================================================================
+# HEATING SCHEDULE TEMPLATE SENSORS
+# Include this file in your configuration.yaml with:
+# template: !include heating_schedule_templates.yaml
+# =============================================================================
+
+- binary_sensor:
+    - name: "Heat Schedule Active Now"
+      unique_id: heat_schedule_active_now
+      state: >
+        {% set enabled = is_state('input_boolean.heat_schedule_enabled', 'on') %}
+        {% if not enabled %}
+          false
+        {% else %}
+          {% set wd = now().weekday() %}  {# 0=Mon, 1=Tue, ..., 6=Sun #}
+          {% set day_names = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] %}
+          {% set day_name = day_names[wd] %}
+          {% set day_active = is_state('input_boolean.heat_schedule_' + day_name + '_active', 'on') %}
+          {% if not day_active %}
+            false
+          {% else %}
+            {% set current_time = now().strftime('%H:%M:%S') %}
+            {% set is_weekend = wd >= 5 %}  {# Saturday=5, Sunday=6 #}
+            {% set is_friday = wd == 4 %}
+
+            {# Determine which time periods to check based on day type #}
+            {% if is_weekend %}
+              {% set periods = [
+                ('weekend_period1', states('input_datetime.heat_weekend_period1_start'), states('input_datetime.heat_weekend_period1_end')),
+                ('weekend_period2', states('input_datetime.heat_weekend_period2_start'), states('input_datetime.heat_weekend_period2_end')),
+                ('weekend_period3', states('input_datetime.heat_weekend_period3_start'), states('input_datetime.heat_weekend_period3_end')),
+                ('weekend_period4', states('input_datetime.heat_weekend_period4_start'), states('input_datetime.heat_weekend_period4_end')),
+                ('weekend_period5', states('input_datetime.heat_weekend_period5_start'), states('input_datetime.heat_weekend_period5_end'))
+              ] %}
+            {% else %}
+              {% if is_friday %}
+                {% set periods = [
+                  ('weekday_period1', states('input_datetime.heat_weekday_period1_start'), states('input_datetime.heat_weekday_period1_end')),
+                  ('weekday_period2', states('input_datetime.heat_weekday_period2_start'), states('input_datetime.heat_weekday_period2_end')),
+                  ('weekday_period3', states('input_datetime.heat_weekday_period3_start'), states('input_datetime.heat_weekday_period3_end')),
+                  ('weekday_period4', states('input_datetime.heat_weekday_period4_start'), states('input_datetime.heat_weekday_period4_end')),
+                  ('friday_period5', states('input_datetime.heat_friday_period5_start'), states('input_datetime.heat_friday_period5_end')),
+                  ('weekday_period6', states('input_datetime.heat_weekday_period6_start'), states('input_datetime.heat_weekday_period6_end'))
+                ] %}
+              {% else %}
+                {% set periods = [
+                  ('weekday_period1', states('input_datetime.heat_weekday_period1_start'), states('input_datetime.heat_weekday_period1_end')),
+                  ('weekday_period2', states('input_datetime.heat_weekday_period2_start'), states('input_datetime.heat_weekday_period2_end')),
+                  ('weekday_period3', states('input_datetime.heat_weekday_period3_start'), states('input_datetime.heat_weekday_period3_end')),
+                  ('weekday_period4', states('input_datetime.heat_weekday_period4_start'), states('input_datetime.heat_weekday_period4_end')),
+                  ('weekday_period5', states('input_datetime.heat_weekday_period5_start'), states('input_datetime.heat_weekday_period5_end')),
+                  ('weekday_period6', states('input_datetime.heat_weekday_period6_start'), states('input_datetime.heat_weekday_period6_end'))
+                ] %}
+              {% endif %}
+            {% endif %}
+
+            {# Check if current time falls within any period #}
+            {% set ns = namespace(active=false) %}
+            {% for period_name, start_time, end_time in periods %}
+              {% if start_time != 'unknown' and end_time != 'unknown' %}
+                {% set s = today_at(start_time) %}
+                {% set e = today_at(end_time) %}
+                {% if e < s %}  {# Period crosses midnight #}
+                  {% if now() >= s or now() < e %}
+                    {% set ns.active = true %}
+                  {% endif %}
+                {% else %}
+                  {% if now() >= s and now() < e %}
+                    {% set ns.active = true %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.active }}
+          {% endif %}
+        {% endif %}
+      icon: mdi:clock-check
+
+- sensor:
+    - name: "Current Heat Schedule Period"
+      unique_id: current_heat_schedule_period
+      state: >
+        {% set enabled = is_state('input_boolean.heat_schedule_enabled', 'on') %}
+        {% if not enabled %}
+          "Schedule Disabled"
+        {% else %}
+          {% set wd = now().weekday() %}  {# 0=Mon, 1=Tue, ..., 6=Sun #}
+          {% set day_names = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] %}
+          {% set day_name = day_names[wd] %}
+          {% set day_active = is_state('input_boolean.heat_schedule_' + day_name + '_active', 'on') %}
+          {% if not day_active %}
+            "Day Inactive"
+          {% else %}
+            {% set current_time = now().strftime('%H:%M:%S') %}
+            {% set is_weekend = wd >= 5 %}  {# Saturday=5, Sunday=6 #}
+            {% set is_friday = wd == 4 %}
+
+            {# Determine which time periods to check based on day type #}
+            {% if is_weekend %}
+              {% set periods = [
+                ('Weekend Period 1', states('input_datetime.heat_weekend_period1_start'), states('input_datetime.heat_weekend_period1_end')),
+                ('Weekend Period 2', states('input_datetime.heat_weekend_period2_start'), states('input_datetime.heat_weekend_period2_end')),
+                ('Weekend Period 3', states('input_datetime.heat_weekend_period3_start'), states('input_datetime.heat_weekend_period3_end')),
+                ('Weekend Period 4', states('input_datetime.heat_weekend_period4_start'), states('input_datetime.heat_weekend_period4_end')),
+                ('Weekend Period 5', states('input_datetime.heat_weekend_period5_start'), states('input_datetime.heat_weekend_period5_end'))
+              ] %}
+            {% else %}
+              {% if is_friday %}
+                {% set periods = [
+                  ('Weekday Period 1', states('input_datetime.heat_weekday_period1_start'), states('input_datetime.heat_weekday_period1_end')),
+                  ('Weekday Period 2', states('input_datetime.heat_weekday_period2_start'), states('input_datetime.heat_weekday_period2_end')),
+                  ('Weekday Period 3', states('input_datetime.heat_weekday_period3_start'), states('input_datetime.heat_weekday_period3_end')),
+                  ('Weekday Period 4', states('input_datetime.heat_weekday_period4_start'), states('input_datetime.heat_weekday_period4_end')),
+                  ('Friday Period 5', states('input_datetime.heat_friday_period5_start'), states('input_datetime.heat_friday_period5_end')),
+                  ('Weekday Period 6', states('input_datetime.heat_weekday_period6_start'), states('input_datetime.heat_weekday_period6_end'))
+                ] %}
+              {% else %}
+                {% set periods = [
+                  ('Weekday Period 1', states('input_datetime.heat_weekday_period1_start'), states('input_datetime.heat_weekday_period1_end')),
+                  ('Weekday Period 2', states('input_datetime.heat_weekday_period2_start'), states('input_datetime.heat_weekday_period2_end')),
+                  ('Weekday Period 3', states('input_datetime.heat_weekday_period3_start'), states('input_datetime.heat_weekday_period3_end')),
+                  ('Weekday Period 4', states('input_datetime.heat_weekday_period4_start'), states('input_datetime.heat_weekday_period4_end')),
+                  ('Weekday Period 5', states('input_datetime.heat_weekday_period5_start'), states('input_datetime.heat_weekday_period5_end')),
+                  ('Weekday Period 6', states('input_datetime.heat_weekday_period6_start'), states('input_datetime.heat_weekday_period6_end'))
+                ] %}
+              {% endif %}
+            {% endif %}
+
+            {# Find which period we're currently in #}
+            {% set ns = namespace(current_period='Outside Schedule') %}
+            {% for period_name, start_time, end_time in periods %}
+              {% if start_time != 'unknown' and end_time != 'unknown' %}
+                {% set s = today_at(start_time) %}
+                {% set e = today_at(end_time) %}
+                {% if e < s %}  {# Period crosses midnight #}
+                  {% if now() >= s or now() < e %}
+                    {% set ns.current_period = period_name + ' (' + start_time + ' - ' + end_time + ')' %}
+                  {% endif %}
+                {% else %}
+                  {% if now() >= s and now() < e %}
+                    {% set ns.current_period = period_name + ' (' + start_time + ' - ' + end_time + ')' %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.current_period }}
+          {% endif %}
+        {% endif %}
+      icon: mdi:clock-outline

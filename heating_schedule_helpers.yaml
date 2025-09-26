@@ -1,0 +1,35 @@
+# =============================================================================
+# HEATING SCHEDULE INPUT HELPERS
+# Include this file in your configuration.yaml with:
+# input_boolean: !include heating_schedule_helpers.yaml
+# input_datetime: !include heating_schedule_helpers.yaml
+# input_number: !include heating_schedule_helpers.yaml
+# =============================================================================
+
+# Global schedule control
+heat_schedule_enabled:
+  name: "Heat Schedule Enabled"
+  icon: mdi:thermostat
+
+# Daily schedule toggles
+heat_schedule_monday_active:
+  name: "Monday Schedule Active"
+  icon: mdi:calendar-today
+heat_schedule_tuesday_active:
+  name: "Tuesday Schedule Active"
+  icon: mdi:calendar-today
+heat_schedule_wednesday_active:
+  name: "Wednesday Schedule Active"
+  icon: mdi:calendar-today
+heat_schedule_thursday_active:
+  name: "Thursday Schedule Active"
+  icon: mdi:calendar-today
+heat_schedule_friday_active:
+  name: "Friday Schedule Active"
+  icon: mdi:calendar-today
+heat_schedule_saturday_active:
+  name: "Saturday Schedule Active"
+  icon: mdi:calendar-today
+heat_schedule_sunday_active:
+  name: "Sunday Schedule Active"
+  icon: mdi:calendar-today

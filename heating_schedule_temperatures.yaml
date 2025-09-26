@@ -1,0 +1,617 @@
+# =============================================================================
+# HEATING SCHEDULE TEMPERATURE VALUES
+# Include this file in your configuration.yaml with:
+# input_number: !include heating_schedule_temperatures.yaml
+# =============================================================================
+
+# =============================================================================
+# WEEKDAY TEMPERATURES (Monday-Thursday)
+# =============================================================================
+
+# Period 1: 00:00-07:00 - All rooms 5°C
+heat_weekday_period1_lukas_park:
+  name: "Weekday Period 1 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period1_lukas_kirche:
+  name: "Weekday Period 1 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period1_lukas_schillerstr:
+  name: "Weekday Period 1 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period1_kueche:
+  name: "Weekday Period 1 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period1_philip:
+  name: "Weekday Period 1 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period1_guest:
+  name: "Weekday Period 1 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 2: 07:00-09:30 - Most rooms 21°C, Guest 20°C
+heat_weekday_period2_lukas_park:
+  name: "Weekday Period 2 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period2_lukas_kirche:
+  name: "Weekday Period 2 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period2_lukas_schillerstr:
+  name: "Weekday Period 2 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period2_kueche:
+  name: "Weekday Period 2 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period2_philip:
+  name: "Weekday Period 2 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period2_guest:
+  name: "Weekday Period 2 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 20
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 3: 09:30-14:30 - Most rooms 21°C, Guest 20°C
+heat_weekday_period3_lukas_park:
+  name: "Weekday Period 3 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period3_lukas_kirche:
+  name: "Weekday Period 3 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period3_lukas_schillerstr:
+  name: "Weekday Period 3 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period3_kueche:
+  name: "Weekday Period 3 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period3_philip:
+  name: "Weekday Period 3 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period3_guest:
+  name: "Weekday Period 3 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 20
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 4: 14:30-21:00 - Most rooms 21°C, Guest 20°C
+heat_weekday_period4_lukas_park:
+  name: "Weekday Period 4 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period4_lukas_kirche:
+  name: "Weekday Period 4 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period4_lukas_schillerstr:
+  name: "Weekday Period 4 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period4_kueche:
+  name: "Weekday Period 4 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period4_philip:
+  name: "Weekday Period 4 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period4_guest:
+  name: "Weekday Period 4 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 20
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 5: 21:00-23:00 - Most rooms 21.5°C, Guest 20°C
+heat_weekday_period5_lukas_park:
+  name: "Weekday Period 5 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period5_lukas_kirche:
+  name: "Weekday Period 5 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period5_lukas_schillerstr:
+  name: "Weekday Period 5 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period5_kueche:
+  name: "Weekday Period 5 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period5_philip:
+  name: "Weekday Period 5 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period5_guest:
+  name: "Weekday Period 5 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 20
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 6: 23:00-24:00 - All rooms 5°C
+heat_weekday_period6_lukas_park:
+  name: "Weekday Period 6 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period6_lukas_kirche:
+  name: "Weekday Period 6 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period6_lukas_schillerstr:
+  name: "Weekday Period 6 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period6_kueche:
+  name: "Weekday Period 6 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period6_philip:
+  name: "Weekday Period 6 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekday_period6_guest:
+  name: "Weekday Period 6 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# =============================================================================
+# FRIDAY TEMPERATURES (Slightly different - Period 5 is same as Period 4)
+# =============================================================================
+
+# Friday Period 5: 21:00-23:00 - Most rooms 21°C (not 21.5°C), Guest 20°C
+heat_friday_period5_lukas_park:
+  name: "Friday Period 5 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_friday_period5_lukas_kirche:
+  name: "Friday Period 5 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_friday_period5_lukas_schillerstr:
+  name: "Friday Period 5 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_friday_period5_kueche:
+  name: "Friday Period 5 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_friday_period5_philip:
+  name: "Friday Period 5 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_friday_period5_guest:
+  name: "Friday Period 5 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 20
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# =============================================================================
+# WEEKEND TEMPERATURES (Saturday & Sunday)
+# =============================================================================
+
+# Period 1: 00:00-07:30 - All rooms 5°C
+heat_weekend_period1_lukas_park:
+  name: "Weekend Period 1 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period1_lukas_kirche:
+  name: "Weekend Period 1 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period1_lukas_schillerstr:
+  name: "Weekend Period 1 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period1_kueche:
+  name: "Weekend Period 1 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period1_philip:
+  name: "Weekend Period 1 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period1_guest:
+  name: "Weekend Period 1 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 2: 07:30-10:30 - Most rooms 21°C, Guest 20°C
+heat_weekend_period2_lukas_park:
+  name: "Weekend Period 2 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period2_lukas_kirche:
+  name: "Weekend Period 2 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period2_lukas_schillerstr:
+  name: "Weekend Period 2 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period2_kueche:
+  name: "Weekend Period 2 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period2_philip:
+  name: "Weekend Period 2 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period2_guest:
+  name: "Weekend Period 2 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 20
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 3: 10:30-19:00 - Most rooms 21°C, Guest 20°C
+heat_weekend_period3_lukas_park:
+  name: "Weekend Period 3 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period3_lukas_kirche:
+  name: "Weekend Period 3 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period3_lukas_schillerstr:
+  name: "Weekend Period 3 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period3_kueche:
+  name: "Weekend Period 3 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period3_philip:
+  name: "Weekend Period 3 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period3_guest:
+  name: "Weekend Period 3 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 20
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 4: 19:00-23:00 - Most rooms 21.5°C, Guest 20°C
+heat_weekend_period4_lukas_park:
+  name: "Weekend Period 4 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period4_lukas_kirche:
+  name: "Weekend Period 4 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period4_lukas_schillerstr:
+  name: "Weekend Period 4 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period4_kueche:
+  name: "Weekend Period 4 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period4_philip:
+  name: "Weekend Period 4 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 21.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period4_guest:
+  name: "Weekend Period 4 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 20
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+
+# Period 5: 23:00-23:59:59 - All rooms 5°C
+heat_weekend_period5_lukas_park:
+  name: "Weekend Period 5 - Lukas Park"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period5_lukas_kirche:
+  name: "Weekend Period 5 - Lukas Kirche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period5_lukas_schillerstr:
+  name: "Weekend Period 5 - Lukas Schillerstr"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period5_kueche:
+  name: "Weekend Period 5 - Küche"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period5_philip:
+  name: "Weekend Period 5 - Philip"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+heat_weekend_period5_guest:
+  name: "Weekend Period 5 - Guest"
+  min: 5
+  max: 30
+  step: 0.5
+  initial: 5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer

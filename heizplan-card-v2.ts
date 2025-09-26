@@ -1409,7 +1409,94 @@ export class HeizplanCardV2 extends LitElement {
 
     this._debug(`Updated schedule entry for ${this._selectedRoom} at ${entry.start}-${entry.stop} to ${newTemperature}°C`);
 
+    // For input_number services, persist the individual temperature value
+    if (this._config?.persistence?.domain === 'input_number') {
+      return await this._persistInputNumberValue(newTemperature, currentDay, index);
+    }
+
+    // For other persistence methods, use the full schedule approach
     return await this._persistSchedule();
+  }
+
+  private async _persistInputNumberValue(temperature: number, day: string, periodIndex: number): Promise<boolean> {
+    if (!this._config?.persistence || !this._hass || !this._selectedRoom) {
+      return false;
+    }
+
+    const { domain, service, schedule_key } = this._config.persistence;
+
+    if (domain !== 'input_number' || service !== 'set_value') {
+      this._debug('Not an input_number.set_value service, falling back to regular persistence');
+      return await this._persistSchedule();
+    }
+
+    // Determine the input_number entity name based on day, period, and room
+    const entityId = this._getInputNumberEntityId(day, periodIndex);
+    if (!entityId) {
+      this._debug(`Could not determine input_number entity for ${day} period ${periodIndex} room ${this._selectedRoom}`);
+      return false;
+    }
+
+    const payload: Record<string, unknown> = {
+      entity_id: entityId,
+      [schedule_key ?? 'value']: temperature
+    };
+
+    this._isPersisting = true;
+
+    try {
+      this._debug(`Calling input_number.set_value with payload:`, payload);
+      await this._hass.callService(domain, service, payload);
+      this._debug(`Successfully updated ${entityId} to ${temperature}°C`);
+      return true;
+    } catch (error: any) {
+      this._errorMessage = `Failed to save temperature: ${error?.message ?? error}`;
+      this._debug('Error while saving temperature to input_number', error);
+      return false;
+    } finally {
+      this._isPersisting = false;
+    }
+  }
+
+  private _getInputNumberEntityId(day: string, periodIndex: number): string | null {
+    if (!this._selectedRoom) {
+      return null;
+    }
+
+    // Map room names to input_number naming convention
+    const roomMap: Record<string, string> = {
+      'T_lukas_park': 'lukas_park',
+      'T_lukas_kirche': 'lukas_kirche',
+      'T_lukas_schillerstr': 'lukas_schillerstr',
+      'T_kueche': 'kueche',
+      'T_philip': 'philip',
+      'T_guest': 'guest'
+    };
+
+    const roomSuffix = roomMap[this._selectedRoom] || this._selectedRoom.toLowerCase().replace(/^t_/, '');
+
+    // Determine day type and period name
+    const dayOfWeek = new Date().getDay(); // 0=Sunday, 1=Monday, etc.
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+    const isFriday = dayOfWeek === 5;
+
+    let periodPrefix: string;
+
+    if (isWeekend) {
+      // Weekend periods: 0-4 -> weekend_period1-5
+      periodPrefix = `weekend_period${periodIndex + 1}`;
+    } else if (isFriday && periodIndex === 4) {
+      // Friday has special period 5
+      periodPrefix = 'friday_period5';
+    } else {
+      // Weekday periods: 0-5 -> weekday_period1-6
+      periodPrefix = `weekday_period${periodIndex + 1}`;
+    }
+
+    const entityId = `input_number.heat_${periodPrefix}_${roomSuffix}`;
+    this._debug(`Generated entity_id: ${entityId} for day=${day}, period=${periodIndex}, room=${this._selectedRoom}`);
+
+    return entityId;
   }
 
   private _maybeLoadScheduleFromHA(hass: HomeAssistant): void {
