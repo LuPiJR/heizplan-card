@@ -75,6 +75,8 @@ name: "Kitchen Heating"        # Display name
 room_temp_key: T_kueche       # Room key for multi-room schedules
 ```
 
+> 💾 **Persistence required for durable changes:** without configuring a persistence helper the card only keeps edits in memory. Reloading the dashboard restores the last schedule that was loaded from Home Assistant.
+
 ### Advanced Configuration
 ```yaml
 type: custom:heizplan-card-v2
@@ -102,7 +104,7 @@ style: |
 
 ### Supported persistence backends
 
-When configuring the optional `persistence` block make sure the target service can store JSON/text payloads:
+When configuring the `persistence` block make sure the target service can store JSON/text payloads:
 
 - `input_text.set_value`
 - `variable.set_variable`
