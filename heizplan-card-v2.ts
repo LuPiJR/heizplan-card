@@ -1218,7 +1218,7 @@ export class HeizplanCardV2 extends LitElement {
     };
   }
 
-  private _adjustTemperature(delta: number) {
+  private async _adjustTemperature(delta: number) {
     if (!this._hass || !this._config.entity) return;
 
     const entity = this._hass.states[this._config.entity];
@@ -1229,6 +1229,17 @@ export class HeizplanCardV2 extends LitElement {
     const clampedTemp = Math.max(min, Math.min(max, newTemp));
 
     this._setThermostatTemperature(clampedTemp);
+
+    try {
+      const scheduleUpdated = await this._updateCurrentScheduleEntry(clampedTemp);
+      if (scheduleUpdated) {
+        this._debug(`Successfully updated both thermostat and schedule to ${clampedTemp}°C`);
+      } else {
+        this._debug(`Thermostat updated to ${clampedTemp}°C, but schedule was not updated (no current time block or persistence not configured)`);
+      }
+    } catch (error) {
+      this._debug('Error updating schedule entry:', error);
+    }
   }
 
   private _setThermostatTemperature(temperature: number) {
@@ -1335,6 +1346,70 @@ export class HeizplanCardV2 extends LitElement {
     const effectiveStop = Math.max(startMinutes + 1, stopMinutes);
 
     return currentMinutes >= startMinutes && currentMinutes < effectiveStop;
+  }
+
+  private _getCurrentTimeBlock(): { entry: ScheduleEntry; index: number } | null {
+    const currentDay = this._getCurrentDay();
+    const daySchedule = this._schedule[currentDay];
+
+    if (!daySchedule || !Array.isArray(daySchedule)) {
+      return null;
+    }
+
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    for (let i = 0; i < daySchedule.length; i++) {
+      const entry = daySchedule[i];
+      const startMinutes = this._timeToMinutes(entry.start);
+      const stopMinutes = this._timeToMinutes(entry.stop);
+      const effectiveStop = Math.max(startMinutes + 1, stopMinutes);
+
+      if (currentMinutes >= startMinutes && currentMinutes < effectiveStop) {
+        return { entry, index: i };
+      }
+    }
+
+    return null;
+  }
+
+  private async _updateCurrentScheduleEntry(newTemperature: number): Promise<boolean> {
+    if (!this._selectedRoom) {
+      this._debug('No room selected, cannot update schedule entry');
+      return false;
+    }
+
+    const currentTimeBlock = this._getCurrentTimeBlock();
+    if (!currentTimeBlock) {
+      this._debug('No current time block found, schedule not updated');
+      return false;
+    }
+
+    const { entry, index } = currentTimeBlock;
+    const currentDay = this._getCurrentDay();
+
+    const updatedEntry: ScheduleEntry = {
+      start: entry.start,
+      stop: entry.stop,
+      temperatures: {
+        ...entry.temperatures,
+        [this._selectedRoom]: newTemperature
+      }
+    };
+
+    const updatedDaySchedule = [...this._schedule[currentDay]];
+    updatedDaySchedule[index] = updatedEntry;
+
+    this._schedule = {
+      ...this._schedule,
+      [currentDay]: updatedDaySchedule
+    };
+
+    this._lastKnownSchedule = this._createMutableSchedule(this._schedule);
+
+    this._debug(`Updated schedule entry for ${this._selectedRoom} at ${entry.start}-${entry.stop} to ${newTemperature}°C`);
+
+    return await this._persistSchedule();
   }
 
   private _maybeLoadScheduleFromHA(hass: HomeAssistant): void {
@@ -1555,14 +1630,28 @@ export class HeizplanCardV2 extends LitElement {
       return false;
     }
 
-    const { domain, service, include_entity, schedule_key, data } = this._config.persistence;
+    const { domain, service } = this._config.persistence;
+
+    // Check if this is the schedule integration which doesn't support runtime updates
+    if (domain === 'schedule') {
+      this._debug('Schedule integration does not support runtime updates. Schedule changes are only visual in the card.');
+      this._errorMessage = 'Schedule changes saved locally only (schedule integration doesn\'t support runtime updates)';
+      return false; // Return false so thermostat is updated but user knows schedule isn't persisted
+    }
+
+    const { include_entity, schedule_key, data } = this._config.persistence;
     const payload: Record<string, unknown> = { ...(data ?? {}) };
 
-    if (include_entity !== false) {
-      if (this._config.schedule_entity) {
+    // Only add entity_id for services that support it
+    if (include_entity === true && this._config.schedule_entity) {
+      const servicesWithEntityId = ['input_text.set_value', 'variable.set_variable', 'python_script'];
+      const serviceKey = `${domain}.${service}`;
+
+      if (servicesWithEntityId.some(s => serviceKey.startsWith(s.split('.')[0]))) {
         payload.entity_id = this._config.schedule_entity;
+        this._debug(`Added entity_id to payload for service: ${serviceKey}`);
       } else {
-        this._debug('include_entity is enabled but no schedule_entity was provided in the config.');
+        this._debug(`Skipping entity_id for service ${serviceKey} as it typically doesn't accept this parameter`);
       }
     }
 
@@ -1572,6 +1661,7 @@ export class HeizplanCardV2 extends LitElement {
     this._isPersisting = true;
 
     try {
+      this._debug(`Calling service ${domain}.${service} with payload:`, payload);
       await this._hass.callService(domain, service, payload);
       return true;
     } catch (error: any) {
