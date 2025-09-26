@@ -100,6 +100,17 @@ style: |
   }
 ```
 
+### Supported persistence backends
+
+When configuring the optional `persistence` block make sure the target service can store JSON/text payloads:
+
+- `input_text.set_value`
+- `variable.set_variable`
+- `python_script` (custom script handling the payload)
+- `rest_command` or other services that accept arbitrary JSON bodies
+
+⚠️ **Do not use numeric-only helpers** such as `input_number.set_value` or `number.set_value`. They only accept numeric payloads and the card will reject them to prevent broken schedule uploads.
+
 ## 🏗️ Development
 
 ### Build Setup

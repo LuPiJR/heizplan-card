@@ -513,6 +513,10 @@ export class HeizplanCardV2 extends LitElement {
       throw new Error('Persistence configuration must specify both a domain and a service.');
     }
 
+    if (normalizedPersistence) {
+      this._validatePersistenceConfig(normalizedPersistence);
+    }
+
     const normalizedConfig: HeizplanCardConfig = {
       ...config,
       name: config.name ?? 'Heizplan',
@@ -541,6 +545,37 @@ export class HeizplanCardV2 extends LitElement {
     if (this._hass && config.schedule_entity) {
       this._maybeLoadScheduleFromHA(this._hass);
     }
+  }
+
+  private _validatePersistenceConfig(persistence: PersistenceConfig): void {
+    const { domain, service } = persistence;
+    const serviceKey = `${domain}.${service}`;
+
+    if (this._isNumericPersistenceTarget(domain, service)) {
+      throw new Error(
+        `Persistence target ${serviceKey} only supports numeric payloads. Please choose a text/JSON capable helper such as input_text.set_value or variable.set_variable.`,
+      );
+    }
+  }
+
+  private _isNumericPersistenceTarget(domain: string, service: string): boolean {
+    const normalizedDomain = domain?.toLowerCase();
+    const normalizedService = service?.toLowerCase();
+    if (!normalizedDomain || !normalizedService) {
+      return false;
+    }
+
+    const serviceKey = `${normalizedDomain}.${normalizedService}`;
+    const numericHelpers = new Set([
+      'input_number.set_value',
+      'input_number.increment',
+      'input_number.decrement',
+      'number.set_value',
+      'number.increment',
+      'number.decrement'
+    ]);
+
+    return numericHelpers.has(serviceKey) || ['input_number', 'number'].includes(normalizedDomain);
   }
 
   private _getCurrentDay(): string {
@@ -1718,6 +1753,20 @@ export class HeizplanCardV2 extends LitElement {
     }
 
     const { domain, service } = this._config.persistence;
+    const serviceKey = `${domain}.${service}`;
+
+    if (this._isNumericPersistenceTarget(domain, service)) {
+      this._errorMessage = `Cannot persist schedule: ${serviceKey} only accepts numeric payloads. Please switch to a text/JSON helper such as input_text.set_value.`;
+      this._debug(`Skipping persistence because ${serviceKey} only accepts numeric payloads.`);
+      return false;
+    }
+
+    const domainServices = this._hass.services?.[domain];
+    if (!domainServices || !(service in domainServices)) {
+      this._errorMessage = `Cannot persist schedule: service ${serviceKey} is unavailable. Verify that the helper exists and is loaded.`;
+      this._debug(`Persistence service ${serviceKey} is not available in Home Assistant.`, this._hass.services);
+      return false;
+    }
 
     // Check if this is the schedule integration which doesn't support runtime updates
     if (domain === 'schedule') {
@@ -1745,9 +1794,8 @@ export class HeizplanCardV2 extends LitElement {
     const key = schedule_key ?? 'schedule';
     payload[key] = this._convertScheduleToHAFormat(this._schedule);
 
-    this._isPersisting = true;
-
     try {
+      this._isPersisting = true;
       this._debug(`Calling service ${domain}.${service} with payload:`, payload);
       await this._hass.callService(domain, service, payload);
       return true;
