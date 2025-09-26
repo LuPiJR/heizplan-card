@@ -76,6 +76,8 @@ name: "Küche Heizplan"
 room_temp_key: T_kueche
 ```
 
+> 💾 **Important:** without configuring a persistence helper the card only keeps edits in memory. Add a `persistence` block so schedule changes are written somewhere Home Assistant can reload.
+
 ### Advanced Configuration
 ```yaml
 type: custom:heizplan-card-v2

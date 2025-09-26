@@ -1755,8 +1755,9 @@ export class HeizplanCardV2 extends LitElement {
 
   private async _persistSchedule(): Promise<boolean> {
     if (!this._config?.persistence) {
-      this._debug('No persistence configuration provided; skipping save.');
-      return true;
+      this._errorMessage = 'Schedule not saved: configure a persistence helper in the card options so changes survive reloads.';
+      this._debug('No persistence configuration provided; refusing to persist schedule.');
+      return false;
     }
 
     if (!this._hass) {
