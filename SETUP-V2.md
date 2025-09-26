@@ -106,6 +106,17 @@ style: |
   }
 ```
 
+### Supported persistence backends
+
+Use persistence targets that accept JSON/text payloads when saving schedules:
+
+- `input_text.set_value`
+- `variable.set_variable`
+- `python_script` (custom logic for storing the schedule)
+- `rest_command` or comparable services that accept structured data
+
+⚠️ **Avoid numeric helpers** such as `input_number.set_value` or `number.set_value`. They only handle single numeric values and the card will refuse to send schedules to them.
+
 ## Features
 
 ### All V1 Features Included
