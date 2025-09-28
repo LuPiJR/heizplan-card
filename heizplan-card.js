@@ -73,26 +73,26 @@
         display: flex;
         align-items: center;
         gap: 0.3rem;
-        font-size: 0.8rem;
+        font-size: 1rem;
         color: var(--secondary-text-color, #aaa);
       }
 
       .battery-icon, .hvac-icon {
-        font-size: 0.9rem;
+        font-size: 1rem;
       }
 
       .battery-low { color: var(--error-color, #ff6b6b); }
       .battery-medium { color: #f39c12; }
       .battery-high { color: #4caf50; }
 
-      .hvac-heating { color: var(--primary-color, #f39c12); }
-      .hvac-cooling { color: #2196f3; }
+      .hvac-heating { color: var(--primary-color, #f39c12); font-size: 1rem; }
+      .hvac-cooling { color: #969696ff; }
 
       .temp-control {
         display: flex;
         align-items: center;
         gap: 0.4rem;
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 0, 0, 0.41);
         padding: 0.35rem 0.5rem;
         border-radius: 999px;
       }
@@ -131,19 +131,31 @@
 
       .mode-display {
         font-size: 0.85rem;
-        color: var(--secondary-text-color, #aaa);
+        color: #fff;
         text-transform: capitalize;
         cursor: pointer;
         padding: 0.25rem 0.55rem;
-        border: 1px solid var(--secondary-text-color, #666);
+        border: 1px solid var(--primary-color, #f39c12);
         border-radius: 0.35rem;
         transition: 0.2s;
+        min-width: 60px;
+        text-align: center;
       }
 
-      .mode-display:hover {
+      .mode-display.mode-off {
+        background: transparent;
+        color: var(--secondary-text-color, #aaa);
+        border-color: var(--secondary-text-color, #666);
+      }
+
+      .mode-display.mode-heat {
         background: var(--primary-color, #f39c12);
         color: #fff;
         border-color: var(--primary-color, #f39c12);
+      }
+
+      .mode-display:hover {
+        opacity: 0.8;
       }
 
       .toggle-switch {
@@ -182,7 +194,8 @@
         display: flex;
         justify-content: center;
         gap: 0.4rem;
-        margin-bottom: 0.6rem;
+        margin-bottom: 0rem;
+        margin-left: 1rem
       }
 
       .view-button {
@@ -193,7 +206,7 @@
         border-radius: 0.3rem;
         cursor: pointer;
         transition: 0.2s;
-        font-size: 0.85rem;
+        font-size: 1rem;
       }
 
       .view-button:hover,
@@ -214,7 +227,7 @@
       .timeline,
       .week-timeline {
         position: relative;
-        height: 1.65rem;
+        height: 2rem;
         background: var(--timeline-background, #2e2e2e);
         border-radius: 0.25rem;
         overflow: hidden;
@@ -312,11 +325,7 @@
           </div>
         </div>
         <div class="mode-controls">
-          <div class="mode-display js-mode" role="button" tabindex="0" aria-label="Cycle HVAC mode"></div>
-          <button class="toggle-switch js-toggle" role="switch" aria-pressed="false" aria-label="Toggle heat">
-            <span class="toggle-off">OFF</span>
-            <span class="toggle-on">HEAT</span>
-          </button>
+          <div class="mode-display js-mode" role="button" tabindex="0" aria-label="Toggle heating mode"></div>
         </div>
       </div>
 
@@ -383,7 +392,6 @@
         weekDays: this.shadowRoot.querySelector('.week-days'),
         temp: this.shadowRoot.querySelector('.js-temp'),
         mode: this.shadowRoot.querySelector('.js-mode'),
-        toggle: this.shadowRoot.querySelector('.js-toggle'),
         batteryLevel: this.shadowRoot.querySelector('.js-battery-level'),
         hvacAction: this.shadowRoot.querySelector('.js-action'),
         error: this.shadowRoot.querySelector('.js-error'),
@@ -475,9 +483,8 @@
         if(t.closest('.js-inc')){ this._adjustTemp(this._config.temp_step); return; }
         if(t.closest('.js-dec')){ this._adjustTemp(-this._config.temp_step); return; }
 
-        // mode
-        if(t.closest('.js-toggle')){ this._toggleHeat(); return; }
-        if(t.closest('.js-mode')){ this._cycleHvacMode(); return; }
+        // mode toggle
+        if(t.closest('.js-mode')){ this._toggleHeat(); return; }
 
         // modal buttons
         if(t.closest('.js-save')){ this._saveEdit(); return; }
@@ -527,8 +534,11 @@
       const displayTemp = Number.isFinite(numericTemp) ? numericTemp : '--';
       this.$.temp.textContent = `${displayTemp}°C`;
       this.$.temp.classList.toggle('is-override', this._manualOverrideActive);
-      this.$.mode.textContent = entity.state || 'unknown';
-      this.$.toggle.setAttribute('aria-pressed', String(entity.state === 'heat' || entity.state === 'auto'));
+
+      // Mode display with visual states
+      const currentMode = entity.state || 'off';
+      this.$.mode.textContent = currentMode.toUpperCase();
+      this.$.mode.className = `mode-display js-mode mode-${currentMode}`;
 
       // Battery status
       this._updateBatteryStatus();
@@ -705,15 +715,6 @@
       this._render();
       this._hass.callService('climate','set_temperature',{ entity_id: this._config.entity, temperature: value })
         .catch(err => this._setError(`Failed to set temperature: ${err?.message || err}`));
-    }
-
-    _cycleHvacMode(){
-      const entity = this._entity(); if(!entity) return;
-      const modes = entity.attributes.hvac_modes || ['off','heat','auto'];
-      const idx = Math.max(0, modes.indexOf(entity.state));
-      const next = modes[(idx + 1) % modes.length];
-      this._hass?.callService('climate','set_hvac_mode',{ entity_id: this._config.entity, hvac_mode: next })
-        .catch(err => this._setError(`Failed to set HVAC mode: ${err?.message || err}`));
     }
 
     _toggleHeat(){
