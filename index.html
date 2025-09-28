@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heizplan Card</title>
+    <style>
+        body {
+            margin: 900px;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #111;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <heizplan-card id="heizplan-card"></heizplan-card>
+
+    <script src="./heizplan-card.js"></script>
+
+    <script>
+        const mockHass = {
+            states: {
+                'climate.test_thermostat': {
+                    state: 'heat',
+                    attributes: {
+                        current_temperature: 19.5,
+                        temperature: 21.0,
+                        hvac_modes: ['off', 'heat', 'auto'],
+                        hvac_action: 'heating',
+                        friendly_name: 'Test Thermostat'
+                    }
+                },
+                'sensor.test_battery': {
+                    state: '78',
+                    attributes: {
+                        unit_of_measurement: '%',
+                        friendly_name: 'Test Battery'
+                    }
+                },
+                'input_text.heizplan_schedule': {
+                    state: '{"monday":[{"start":"00:00","stop":"07:00","temperature":5},{"start":"07:00","stop":"09:30","temperature":21},{"start":"09:30","stop":"14:30","temperature":21},{"start":"14:30","stop":"21:00","temperature":21},{"start":"21:00","stop":"23:00","temperature":21.5},{"start":"23:00","stop":"24:00","temperature":5}],"tuesday":[{"start":"00:00","stop":"07:00","temperature":5},{"start":"07:00","stop":"09:30","temperature":21},{"start":"09:30","stop":"14:30","temperature":21},{"start":"14:30","stop":"21:00","temperature":21},{"start":"21:00","stop":"23:00","temperature":21.5},{"start":"23:00","stop":"24:00","temperature":5}],"wednesday":[{"start":"00:00","stop":"07:00","temperature":5},{"start":"07:00","stop":"09:30","temperature":21},{"start":"09:30","stop":"14:30","temperature":21},{"start":"14:30","stop":"21:00","temperature":21},{"start":"21:00","stop":"23:00","temperature":21.5},{"start":"23:00","stop":"24:00","temperature":5}],"thursday":[{"start":"00:00","stop":"07:00","temperature":5},{"start":"07:00","stop":"09:30","temperature":21},{"start":"09:30","stop":"14:30","temperature":21},{"start":"14:30","stop":"21:00","temperature":21},{"start":"21:00","stop":"23:00","temperature":21.5},{"start":"23:00","stop":"24:00","temperature":5}],"friday":[{"start":"00:00","stop":"07:00","temperature":5},{"start":"07:00","stop":"09:30","temperature":21},{"start":"09:30","stop":"14:30","temperature":21},{"start":"14:30","stop":"21:00","temperature":21},{"start":"21:00","stop":"23:00","temperature":21},{"start":"23:00","stop":"24:00","temperature":5}],"saturday":[{"start":"00:00","stop":"07:30","temperature":5},{"start":"07:30","stop":"10:30","temperature":21},{"start":"10:30","stop":"19:00","temperature":21},{"start":"19:00","stop":"23:00","temperature":21.5},{"start":"23:00","stop":"24:00","temperature":5}],"sunday":[{"start":"00:00","stop":"07:30","temperature":5},{"start":"07:30","stop":"10:30","temperature":21},{"start":"10:30","stop":"19:00","temperature":21},{"start":"19:00","stop":"23:00","temperature":21.5},{"start":"23:00","stop":"24:00","temperature":5}]}',
+                    attributes: {
+                        friendly_name: 'Heizplan Schedule'
+                    }
+                }
+            },
+            services: {
+                climate: {
+                    set_temperature: {},
+                    set_hvac_mode: {}
+                },
+                input_text: {
+                    set_value: {}
+                }
+            },
+            callService: async (domain, service, data) => {
+                console.log(`Service Call: ${domain}.${service}`, data);
+
+                if (domain === 'climate' && service === 'set_temperature') {
+                    mockHass.states['climate.test_thermostat'].attributes.temperature = data.temperature;
+                }
+
+                if (domain === 'climate' && service === 'set_hvac_mode') {
+                    mockHass.states['climate.test_thermostat'].state = data.hvac_mode;
+                }
+
+                if (domain === 'input_text' && service === 'set_value') {
+                    mockHass.states[data.entity_id].state = data.value;
+                }
+
+                return Promise.resolve();
+            },
+            config: {},
+            locale: { language: 'en' }
+        };
+
+        window.addEventListener('load', () => {
+            const card = document.getElementById('heizplan-card');
+            card.hass = mockHass;
+            card.setConfig({
+                entity: 'climate.test_thermostat',
+                name: 'Heizplan',
+                min_temp: 5,
+                max_temp: 30,
+                temp_step: 0.5,
+                schedule_text_entity: 'input_text.heizplan_schedule',
+                battery_entity: 'sensor.test_battery'
+            });
+        });
+    </script>
+</body>
+</html>

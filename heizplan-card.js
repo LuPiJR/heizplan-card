@@ -24,21 +24,18 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 0.6rem;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
       }
 
       .header-info {
         display: flex;
         flex-direction: column;
         gap: 0.2rem;
-        min-width: 7.5rem;
-        flex: 1 1 9rem;
+        flex: 1;
       }
 
       .card-title {
-        font-size: 1rem;
+        font-size: 1.1rem;
         font-weight: 600;
       }
 
@@ -50,11 +47,46 @@
       .header-controls {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-        flex: 1 1 auto;
+        gap: 0.5rem;
       }
+
+      .status-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 0.4rem;
+      }
+
+      .status-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1;
+      }
+
+      .battery-status, .hvac-status {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.8rem;
+        color: var(--secondary-text-color, #aaa);
+      }
+
+      .battery-icon, .hvac-icon {
+        font-size: 0.9rem;
+      }
+
+      .battery-low { color: var(--error-color, #ff6b6b); }
+      .battery-medium { color: #f39c12; }
+      .battery-high { color: #4caf50; }
+
+      .hvac-heating { color: var(--primary-color, #f39c12); }
+      .hvac-cooling { color: #2196f3; }
 
       .temp-control {
         display: flex;
@@ -150,7 +182,7 @@
         display: flex;
         justify-content: center;
         gap: 0.4rem;
-        margin-bottom: 0.65rem;
+        margin-bottom: 0.6rem;
       }
 
       .view-button {
@@ -261,19 +293,31 @@
             <div class="temp-display js-temp"></div>
             <button class="temp-button js-inc" aria-label="Increase setpoint">+</button>
           </div>
-          <div class="mode-controls">
-            <div class="mode-display js-mode" role="button" tabindex="0" aria-label="Cycle HVAC mode"></div>
-            <button class="toggle-switch js-toggle" role="switch" aria-pressed="false" aria-label="Toggle heat">
-              <span class="toggle-off">OFF</span>
-              <span class="toggle-on">HEAT</span>
-            </button>
-          </div>
         </div>
       </div>
 
-      <div class="view-controls" role="tablist" aria-label="Schedule view">
-        <button class="view-button js-view" data-view="single" role="tab" aria-selected="true">Today</button>
-        <button class="view-button js-view" data-view="week" role="tab" aria-selected="false">Week</button>
+      <div class="status-bar">
+        <div class="status-info">
+          <div class="battery-status js-battery">
+            <span class="battery-icon">Battery</span>
+            <span class="battery-level js-battery-level">--</span>
+          </div>
+          <div class="hvac-status js-hvac-action">
+            <span class="hvac-icon">Action</span>
+            <span class="hvac-action js-action">--</span>
+          </div>
+          <div class="view-controls" role="tablist" aria-label="Schedule view">
+            <button class="view-button js-view" data-view="single" role="tab" aria-selected="true">Today</button>
+            <button class="view-button js-view" data-view="week" role="tab" aria-selected="false">Week</button>
+          </div>
+        </div>
+        <div class="mode-controls">
+          <div class="mode-display js-mode" role="button" tabindex="0" aria-label="Cycle HVAC mode"></div>
+          <button class="toggle-switch js-toggle" role="switch" aria-pressed="false" aria-label="Toggle heat">
+            <span class="toggle-off">OFF</span>
+            <span class="toggle-on">HEAT</span>
+          </button>
+        </div>
       </div>
 
       <section class="single-day-view" part="single" aria-label="Single day schedule">
@@ -340,6 +384,8 @@
         temp: this.shadowRoot.querySelector('.js-temp'),
         mode: this.shadowRoot.querySelector('.js-mode'),
         toggle: this.shadowRoot.querySelector('.js-toggle'),
+        batteryLevel: this.shadowRoot.querySelector('.js-battery-level'),
+        hvacAction: this.shadowRoot.querySelector('.js-action'),
         error: this.shadowRoot.querySelector('.js-error'),
         modal: this.shadowRoot.querySelector('.edit-modal'),
         range: this.shadowRoot.querySelector('.js-range'),
@@ -363,6 +409,7 @@
         temp_step: Number(config.temp_step ?? 0.5),
         entity: config.entity,
         schedule_text_entity: config.schedule_text_entity, // single source of truth
+        battery_entity: config.battery_entity, // optional battery sensor
       };
       this._schedule = this._defaultSchedule(); // until hass() loads input_text
       this._render();
@@ -482,6 +529,12 @@
       this.$.temp.classList.toggle('is-override', this._manualOverrideActive);
       this.$.mode.textContent = entity.state || 'unknown';
       this.$.toggle.setAttribute('aria-pressed', String(entity.state === 'heat' || entity.state === 'auto'));
+
+      // Battery status
+      this._updateBatteryStatus();
+
+      // HVAC action
+      this._updateHvacAction(entity);
 
       // Views
       if(this._currentView === 'single'){
@@ -840,6 +893,52 @@
       this._manualOverrideActive = false;
       this._manualOverrideTemp = null;
       this._manualOverride = null;
+    }
+
+    _updateBatteryStatus(){
+      const batteryEntity = this._config.battery_entity;
+      if (!batteryEntity || !this._hass?.states?.[batteryEntity]) {
+        this.$.batteryLevel.textContent = '--';
+        this.$.batteryLevel.className = 'battery-level js-battery-level';
+        return;
+      }
+
+      const battery = this._hass.states[batteryEntity];
+      const level = Number(battery.state);
+
+      if (Number.isNaN(level)) {
+        this.$.batteryLevel.textContent = '--';
+        this.$.batteryLevel.className = 'battery-level js-battery-level';
+        return;
+      }
+
+      this.$.batteryLevel.textContent = `${level}%`;
+
+      // Color coding based on battery level
+      let className = 'battery-level js-battery-level ';
+      if (level <= 20) {
+        className += 'battery-low';
+      } else if (level <= 50) {
+        className += 'battery-medium';
+      } else {
+        className += 'battery-high';
+      }
+      this.$.batteryLevel.className = className;
+    }
+
+    _updateHvacAction(entity){
+      const action = entity?.attributes?.hvac_action;
+      if (!action) {
+        this.$.hvacAction.textContent = '--';
+        return;
+      }
+
+      // Capitalize first letter and show the action
+      const displayAction = action.charAt(0).toUpperCase() + action.slice(1);
+      this.$.hvacAction.textContent = displayAction;
+
+      // Color code based on action
+      this.$.hvacAction.className = `hvac-action js-action ${action === 'heating' ? 'hvac-heating' : action === 'cooling' ? 'hvac-cooling' : ''}`;
     }
 
     _switchView(view){ if(view !== 'single' && view !== 'week') return; this._currentView = view; this._render(); }
