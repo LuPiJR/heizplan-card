@@ -168,18 +168,23 @@ interface ScheduleEntry {
 ## Migration from V1
 
 ### Automatic Migration
-V2 uses the same configuration format as V1, so you can simply:
+The legacy vanilla card only expects the basics (`entity`, `name`, `schedule_text_entity`). To migrate:
 
 1. **Install V2** following the setup instructions above
-2. **Change card type** in your dashboard:
+2. **Change the card type** and, if needed, add V2-only options:
    ```yaml
-   # Change this:
+   # Legacy card
    type: custom:heizplan-card
+   schedule_text_entity: input_text.heizplan_schedule
 
-   # To this:
+   # V2 upgrade (optional extras shown)
    type: custom:heizplan-card-v2
+   room_temp_key: T_kueche
+   persistence:
+     domain: input_number
+     service: set_value
    ```
-3. **Keep all other settings** exactly the same
+3. **Keep the original fields** (like `entity` and `name`) unchanged
 
 ### Benefits After Migration
 - **Faster UI updates** when editing schedules

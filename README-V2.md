@@ -140,17 +140,21 @@ npm run format
 
 ## 🔄 Migration from V1
 
-**Zero Breaking Changes** - V2 is fully compatible with V1 configurations:
+**Zero Breaking Changes** - V2 accepts every option the legacy card used and adds more when you need them:
 
 ```yaml
-# Simply change the card type:
-type: custom:heizplan-card      # V1
-type: custom:heizplan-card-v2   # V2
-
-# All other settings stay the same!
+# Legacy vanilla card (heizplan-card.js)
+type: custom:heizplan-card
 entity: climate.hk_kuche
 name: "Küche Heizplan"
-# ... rest of config unchanged
+schedule_text_entity: input_text.heizplan_schedule
+
+# Upgrading? Switch the type and optionally add V2-only extras
+type: custom:heizplan-card-v2
+room_temp_key: T_kueche          # Optional multi-room key (V2 only)
+persistence:                      # Optional persistence block (V2 only)
+  domain: input_number
+  service: set_value
 ```
 
 ## 💡 Why LitElement?
