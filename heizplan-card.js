@@ -14,7 +14,7 @@
       .heizplan-card {
         background: var(--card-background-color, #1e1e1e);
         border-radius: var(--border-radius, 0.5rem);
-        padding: 1rem 1.25rem 1.1rem;
+        padding: 0.75rem;
         font-family: var(--primary-font-family, Arial, sans-serif);
         color: var(--primary-text-color, #fff);
         box-shadow: var(--card-box-shadow, 0 0.4rem 0.6rem rgba(0, 0, 0, 0.2));
@@ -24,14 +24,13 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 0.85rem;
+        margin-bottom: 0.5rem;
       }
 
       .header-info {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.2rem;
         flex: 1;
       }
 
@@ -56,9 +55,9 @@
         align-items: center;
         justify-content: space-between;
         flex-wrap: wrap;
-        gap: 0.75rem 1.25rem;
-        margin-bottom: 1rem;
-        padding: 0.75rem 1rem;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        padding: 0.5rem;
         background: rgba(255, 255, 255, 0.03);
         border-radius: 0.4rem;
       }
@@ -66,9 +65,8 @@
       .status-info {
         display: flex;
         align-items: center;
-        gap: 0.75rem 1.25rem;
-        flex: 1 1 auto;
-        flex-wrap: wrap;
+        gap: 0.75rem;
+        flex: 1;
       }
 
       .battery-status, .hvac-status {
@@ -126,7 +124,7 @@
       .mode-controls {
         display: flex;
         align-items: center;
-        gap: 0.6rem;
+        gap: 0.5rem;
         flex-wrap: wrap;
         justify-content: flex-end;
       }
@@ -183,9 +181,8 @@
       .view-controls {
         display: flex;
         justify-content: center;
-        gap: 0.45rem;
-        margin: 0.35rem auto 0;
-        width: 100%;
+        gap: 0.4rem;
+        margin-bottom: 0.6rem;
       }
 
       .view-button {
@@ -224,28 +221,15 @@
         cursor: pointer;
       }
 
-      .single-day-view,
-      .week-schedule-view {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-
-      .week-days {
-        display: flex;
-        flex-direction: column;
-        gap: 0.55rem;
-      }
-
       .week-day {
         display: flex;
         align-items: center;
-        gap: 0.6rem;
-        min-height: 2rem;
+        gap: 0.45rem;
+        min-height: 1.8rem;
       }
 
       .week-day-header {
-        width: 2.5rem;
+        width: 2rem;
         font-size: 0.75rem;
         font-weight: 600;
         text-align: center;
@@ -254,7 +238,7 @@
 
       .week-timeline {
         flex: 1;
-        height: 1.5rem;
+        height: 1.4rem;
       }
 
       .time-block {
