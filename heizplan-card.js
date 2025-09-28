@@ -168,7 +168,6 @@
         min_temp: Number(config.min_temp ?? 5),
         max_temp: Number(config.max_temp ?? 30),
         temp_step: Number(config.temp_step ?? 0.5),
-        room_temp_key: config.room_temp_key || 'T_kueche',
         entity: config.entity,
         schedule_text_entity: config.schedule_text_entity, // single source of truth
       };

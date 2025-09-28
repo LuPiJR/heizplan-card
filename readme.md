@@ -98,6 +98,22 @@ The input helpers recreate your exact schedule structure:
 
 Add the card to your Lovelace dashboard:
 
+#### Legacy Vanilla Card (`custom:heizplan-card`)
+
+```yaml
+type: custom:heizplan-card
+entity: climate.hk_kuche
+name: "Küche Heizplan"
+schedule_text_entity: input_text.heizplan_schedule
+min_temp: 5
+max_temp: 30
+temp_step: 0.5
+```
+
+> The vanilla JavaScript card stores its schedule in a single `input_text` helper referenced by `schedule_text_entity`. It does not accept `room_temp_key` or persistence blocks.
+
+#### LitElement Card (`custom:heizplan-card-v2`)
+
 ```yaml
 type: custom:heizplan-card-v2
 entity: climate.hk_kuche
@@ -132,7 +148,7 @@ debug: false
 
 ## 📖 Configuration Reference
 
-### Card Configuration Options
+### LitElement Card (`custom:heizplan-card-v2`)
 
 | Option | Type | Default | Required | Description |
 |--------|------|---------|----------|-------------|
@@ -144,6 +160,17 @@ debug: false
 | `room_temp_key` | string | "default_room" | ❌ | Primary room identifier |
 | `persistence` | object | - | ✅ | Storage configuration |
 | `debug` | boolean | false | ❌ | Enable detailed logging |
+
+### Legacy Vanilla Card (`custom:heizplan-card`)
+
+| Option | Type | Default | Required | Description |
+|--------|------|---------|----------|-------------|
+| `entity` | string | - | ✅ | Climate entity controlled by the card |
+| `name` | string | "Heizplan" | ❌ | Card title displayed in header |
+| `min_temp` | number | 5 | ❌ | Minimum temperature limit |
+| `max_temp` | number | 30 | ❌ | Maximum temperature limit |
+| `temp_step` | number | 0.5 | ❌ | Temperature adjustment increment |
+| `schedule_text_entity` | string | - | ✅ | `input_text` helper used to persist the schedule |
 
 ### Persistence Configuration
 
@@ -256,8 +283,9 @@ Service call: input_number.set_value
 **Problem**: "No rooms available in the schedule"
 **Solutions**:
 1. Ensure temperature input helpers exist for your rooms
-2. Verify `room_temp_key` matches your room naming
-3. Check that helpers follow naming convention: `heat_[period]_[room]`
+2. _(V2)_ Verify `room_temp_key` matches your room naming
+3. _(V1)_ Confirm `schedule_text_entity` points to the intended `input_text`
+4. Check that helpers follow naming convention: `heat_[period]_[room]`
 
 #### Temperature changes reset after reload
 
