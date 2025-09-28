@@ -22,7 +22,8 @@
     "resolveJsonModule": true
   },
   "include": [
-    "heizplan-card-v2.ts"
+    "heizplan-card-v2.ts",
+    "heizplan-card-v3.ts"
   ],
   "exclude": [
     "node_modules",

@@ -73,6 +73,8 @@ export class HeizplanCardV2 extends LitElement {
     this.requestUpdate('hass', oldValue);
     if (value && this._config?.schedule_entity) {
       this._maybeLoadScheduleFromHA(value);
+    } else if (value && this._config?.persistence?.domain === 'input_number') {
+      this._maybeLoadScheduleFromInputHelpers(value);
     }
   }
 
@@ -544,6 +546,8 @@ export class HeizplanCardV2 extends LitElement {
 
     if (this._hass && config.schedule_entity) {
       this._maybeLoadScheduleFromHA(this._hass);
+    } else if (this._hass && normalizedConfig.persistence?.domain === 'input_number') {
+      this._maybeLoadScheduleFromInputHelpers(this._hass);
     }
   }
 
@@ -1589,6 +1593,144 @@ export class HeizplanCardV2 extends LitElement {
         this._schedule = this._createMutableSchedule(this._lastKnownSchedule);
       }
     }
+  }
+
+  private _maybeLoadScheduleFromInputHelpers(hass: HomeAssistant): void {
+    if (!this._config?.persistence || this._config.persistence.domain !== 'input_number') {
+      return;
+    }
+
+    try {
+      const schedule = this._buildScheduleFromInputHelpers(hass);
+      if (Object.keys(schedule).length > 0) {
+        this._applySchedule(schedule);
+        this._debug('Successfully loaded schedule from input helpers');
+      } else {
+        this._debug('No input helpers found, using default schedule');
+        // Use default schedule if no input helpers are found
+        const defaultSchedule = this._getDefaultSchedule(this._config.room_temp_key);
+        this._applySchedule(defaultSchedule);
+      }
+    } catch (error) {
+      this._debug('Error loading schedule from input helpers:', error);
+      this._errorMessage = 'Failed to load schedule from input helpers. Using default schedule.';
+      // Fallback to default schedule
+      const defaultSchedule = this._getDefaultSchedule(this._config.room_temp_key);
+      this._applySchedule(defaultSchedule);
+    }
+  }
+
+  private _buildScheduleFromInputHelpers(hass: HomeAssistant): Schedule {
+    const schedule: Schedule = {};
+    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+    // Room mapping - reverse of what we use for saving
+    const allRooms = ['lukas_park', 'lukas_kirche', 'lukas_schillerstr', 'kueche', 'philip', 'guest'];
+    const roomToTempKey: Record<string, string> = {
+      'lukas_park': 'T_lukas_park',
+      'lukas_kirche': 'T_lukas_kirche',
+      'lukas_schillerstr': 'T_lukas_schillerstr',
+      'kueche': 'T_kueche',
+      'philip': 'T_philip',
+      'guest': 'T_guest'
+    };
+
+    for (const day of dayNames) {
+      const daySchedule: ScheduleEntry[] = [];
+
+      // Determine number of periods and their prefixes for this day
+      const dayOfWeek = dayNames.indexOf(day); // 0=monday, 6=sunday
+      const isWeekend = dayOfWeek >= 5; // saturday=5, sunday=6
+      const isFriday = dayOfWeek === 4;
+
+      let periods: string[];
+      let timeHelperPrefixes: string[];
+
+      if (isWeekend) {
+        periods = ['weekend_period1', 'weekend_period2', 'weekend_period3', 'weekend_period4', 'weekend_period5'];
+        timeHelperPrefixes = ['heat_weekend_period1', 'heat_weekend_period2', 'heat_weekend_period3', 'heat_weekend_period4', 'heat_weekend_period5'];
+      } else {
+        periods = ['weekday_period1', 'weekday_period2', 'weekday_period3', 'weekday_period4', 'weekday_period5', 'weekday_period6'];
+        timeHelperPrefixes = ['heat_weekday_period1', 'heat_weekday_period2', 'heat_weekday_period3', 'heat_weekday_period4', 'heat_weekday_period5', 'heat_weekday_period6'];
+
+        // Special case for Friday period 5
+        if (isFriday) {
+          periods[4] = 'friday_period5';
+          timeHelperPrefixes[4] = 'heat_friday_period5';
+        }
+      }
+
+      // Build schedule entries for this day
+      for (let periodIndex = 0; periodIndex < periods.length; periodIndex++) {
+        const periodPrefix = periods[periodIndex];
+        const timePrefix = timeHelperPrefixes[periodIndex];
+
+        // Get start and end times
+        const startEntity = hass.states[`input_datetime.${timePrefix}_start`];
+        const endEntity = hass.states[`input_datetime.${timePrefix}_end`];
+
+        if (!startEntity || !endEntity) {
+          this._debug(`Missing time helpers for ${timePrefix}`);
+          continue;
+        }
+
+        const start = this._extractTimeFromInputDateTime(startEntity.state);
+        const stop = this._extractTimeFromInputDateTime(endEntity.state);
+
+        if (!start || !stop) {
+          this._debug(`Invalid time values for ${timePrefix}: start=${startEntity.state}, end=${endEntity.state}`);
+          continue;
+        }
+
+        // Get temperatures for all rooms
+        const temperatures: Record<string, number> = {};
+        for (const room of allRooms) {
+          const tempEntityId = `input_number.heat_${periodPrefix}_${room}`;
+          const tempEntity = hass.states[tempEntityId];
+
+          if (tempEntity && !isNaN(Number(tempEntity.state))) {
+            const tempKey = roomToTempKey[room];
+            if (tempKey) {
+              temperatures[tempKey] = Number(tempEntity.state);
+            }
+          }
+        }
+
+        // Only add entry if we have at least one temperature
+        if (Object.keys(temperatures).length > 0) {
+          daySchedule.push({
+            start,
+            stop,
+            temperatures
+          });
+        }
+      }
+
+      if (daySchedule.length > 0) {
+        schedule[day] = daySchedule;
+      }
+    }
+
+    this._debug(`Built schedule from input helpers:`, schedule);
+    return schedule;
+  }
+
+  private _extractTimeFromInputDateTime(state: string): string | null {
+    if (!state) return null;
+
+    // Input datetime returns time in HH:MM:SS format
+    if (state.match(/^\d{2}:\d{2}:\d{2}$/)) {
+      // Convert HH:MM:SS to HH:MM
+      return state.substring(0, 5);
+    }
+
+    // If it's already HH:MM format
+    if (state.match(/^\d{2}:\d{2}$/)) {
+      return state;
+    }
+
+    this._debug(`Unable to parse time from input_datetime state: ${state}`);
+    return null;
   }
 
   private _convertHAScheduleFormat(haSchedule: any): Schedule {
