@@ -106,7 +106,7 @@ export class HeizplanCardV2 extends LitElement {
       .heizplan-card {
         background: var(--card-background-color, #1e1e1e);
         border-radius: var(--border-radius, 0.5rem);
-        padding: 1rem;
+        padding: 0.75rem;
         font-family: var(--primary-font-family, Arial, sans-serif);
         color: var(--primary-text-color, #fff);
         box-shadow: var(--card-box-shadow, 0 0.4rem 0.6rem rgba(0, 0, 0, 0.2));
@@ -114,41 +114,59 @@ export class HeizplanCardV2 extends LitElement {
 
       .card-header {
         display: flex;
-        justify-content: space-between;
+        flex-wrap: wrap;
         align-items: center;
-        margin-bottom: 1rem;
-        font-size: 1.3rem;
-        font-weight: bold;
+        gap: 0.6rem;
+        row-gap: 0.4rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .header-section {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+
+      .header-info {
+        flex: 1 1 9rem;
+        min-width: 8rem;
       }
 
       .title-stack {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.15rem;
+      }
+
+      .card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
       }
 
       .current-temp {
-        font-size: 1rem;
+        font-size: 0.9rem;
         color: var(--secondary-text-color, #aaa);
       }
 
       .room-selector {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 0.25rem;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         color: var(--secondary-text-color, #aaa);
+      }
+
+      .room-selector.header-section {
+        justify-content: flex-end;
+        min-width: 8rem;
       }
 
       .room-selector label {
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.06em;
       }
 
       .room-selector span {
-        font-size: 1rem;
+        font-size: 0.95rem;
         color: var(--primary-text-color, #fff);
       }
 
@@ -157,8 +175,8 @@ export class HeizplanCardV2 extends LitElement {
         color: var(--primary-text-color, #fff);
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 0.25rem;
-        padding: 0.25rem 0.5rem;
-        min-width: 8rem;
+        padding: 0.2rem 0.5rem;
+        min-width: 7rem;
       }
 
       .room-selector select:focus-visible {
@@ -170,19 +188,19 @@ export class HeizplanCardV2 extends LitElement {
       .view-controls {
         display: flex;
         justify-content: center;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
+        gap: 0.4rem;
+        margin-bottom: 0.75rem;
       }
 
       .view-button {
-        padding: 0.5rem 1rem;
+        padding: 0.35rem 0.75rem;
         border: 1px solid var(--primary-color, #f39c12);
         background: transparent;
         color: var(--primary-color, #f39c12);
         border-radius: 0.25rem;
         cursor: pointer;
         transition: all 0.2s ease;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
       }
 
       .view-button:hover {
@@ -203,19 +221,19 @@ export class HeizplanCardV2 extends LitElement {
       /* Single Day View */
       .schedule-container {
         width: 100%;
-        margin: 1rem 0;
+        margin: 0.75rem 0 0.5rem;
       }
 
       .day-header {
-        font-size: 1.1rem;
-        margin-bottom: 0.5rem;
+        font-size: 1rem;
+        margin-bottom: 0.35rem;
         color: var(--primary-text-color, #fff);
       }
 
       .timeline {
         display: flex;
         position: relative;
-        height: 2.5rem;
+        height: 1.8rem;
         background-color: var(--timeline-background, #2e2e2e);
         border-radius: 0.25rem;
         overflow: hidden;
@@ -230,36 +248,36 @@ export class HeizplanCardV2 extends LitElement {
       .week-markers {
         display: flex;
         justify-content: space-between;
-        margin-top: 0.5rem;
-        font-size: 0.75rem;
+        margin-top: 0.4rem;
+        font-size: 0.72rem;
         color: var(--secondary-text-color, #aaa);
-        padding: 0 0 0 2rem;
+        padding: 0 0 0 1.6rem;
       }
 
       .week-days {
         display: flex;
         flex-direction: column;
-        gap: 0.3rem;
+        gap: 0.25rem;
       }
 
       .week-day {
         display: flex;
         align-items: center;
-        min-height: 2rem;
+        min-height: 1.75rem;
       }
 
       .week-day-header {
         min-width: 2rem;
-        font-size: 0.9rem;
-        font-weight: bold;
+        font-size: 0.85rem;
+        font-weight: 600;
         color: var(--primary-text-color, #fff);
         text-align: center;
-        padding-right: 0.5rem;
+        padding-right: 0.4rem;
       }
 
       .week-timeline {
         flex: 1;
-        height: 1.8rem;
+        height: 1.4rem;
         position: relative;
         background-color: var(--timeline-background, #2e2e2e);
         border-radius: 0.25rem;
@@ -272,7 +290,7 @@ export class HeizplanCardV2 extends LitElement {
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1rem;
+        font-size: 0.85rem;
         color: #fff;
         height: 100%;
         box-sizing: border-box;
@@ -292,7 +310,7 @@ export class HeizplanCardV2 extends LitElement {
       }
 
       .week-timeline .time-block {
-        font-size: 0.7rem;
+        font-size: 0.65rem;
       }
 
       .week-timeline .time-block:hover {
@@ -303,36 +321,34 @@ export class HeizplanCardV2 extends LitElement {
       .time-markers {
         display: flex;
         justify-content: space-between;
-        margin-top: 0.5rem;
-        font-size: 0.75rem;
+        margin-top: 0.35rem;
+        font-size: 0.7rem;
         color: var(--secondary-text-color, #aaa);
       }
 
       /* Controls */
-      .controls {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      .header-controls {
+        flex: 1 1 12rem;
+        justify-content: flex-end;
+        gap: 0.6rem;
+        margin-left: auto;
       }
 
       .temp-control {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.35rem;
       }
 
       .temp-button {
         background: var(--primary-color, #f39c12);
         border: none;
         border-radius: 50%;
-        width: 2rem;
-        height: 2rem;
+        width: 1.6rem;
+        height: 1.6rem;
         color: white;
         cursor: pointer;
-        font-size: 1rem;
+        font-size: 0.9rem;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -343,25 +359,25 @@ export class HeizplanCardV2 extends LitElement {
       }
 
       .temp-display {
-        font-size: 1.2rem;
-        font-weight: bold;
-        min-width: 3rem;
+        font-size: 1.05rem;
+        font-weight: 600;
+        min-width: 2.5rem;
         text-align: center;
       }
 
       .mode-controls {
         display: flex;
-        flex-direction: column;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.35rem;
+        flex-wrap: wrap;
       }
 
       .mode-display {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         color: var(--secondary-text-color, #aaa);
         text-transform: capitalize;
         cursor: pointer;
-        padding: 0.3rem 0.6rem;
+        padding: 0.25rem 0.5rem;
         border: 1px solid var(--secondary-text-color, #aaa);
         border-radius: 0.25rem;
         transition: all 0.2s ease;
@@ -375,9 +391,9 @@ export class HeizplanCardV2 extends LitElement {
 
       .toggle-switch {
         position: relative;
-        width: 80px;
-        height: 32px;
-        border-radius: 16px;
+        width: 64px;
+        height: 26px;
+        border-radius: 13px;
         border: none;
         background: #666;
         cursor: pointer;
@@ -393,7 +409,7 @@ export class HeizplanCardV2 extends LitElement {
         position: absolute;
         top: 50%;
         transform: translateY(-50%);
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: bold;
         color: white;
         transition: opacity 0.3s ease;
@@ -814,7 +830,6 @@ export class HeizplanCardV2 extends LitElement {
         ${this._currentView === 'single'
           ? this._renderSingleDayView()
           : this._renderWeekView()}
-        ${this._renderControls(entity)}
         ${this._renderErrorMessage()}
         ${this._renderEditModal()}
       </div>
@@ -822,13 +837,18 @@ export class HeizplanCardV2 extends LitElement {
   }
 
   private _renderHeader(entity: any): TemplateResult {
+    const title = this._config.name || entity.attributes.friendly_name || 'Heizplan';
+
     return html`
       <div class="card-header">
-        <div class="title-stack">
-          <div class="card-title">${this._config.name}</div>
-          <div class="current-temp">${entity.attributes.current_temperature ?? '--'}°C</div>
+        <div class="header-section header-info">
+          <div class="title-stack">
+            <div class="card-title">${title}</div>
+            <div class="current-temp">${entity.attributes.current_temperature ?? '--'}°C</div>
+          </div>
         </div>
         ${this._renderRoomSelector()}
+        ${this._renderControls(entity)}
       </div>
     `;
   }
@@ -840,7 +860,7 @@ export class HeizplanCardV2 extends LitElement {
 
     if (this._availableRooms.length === 1) {
       return html`
-        <div class="room-selector" role="presentation">
+        <div class="room-selector header-section" role="presentation">
           <label>Room</label>
           <span>${this._formatRoomName(this._availableRooms[0])}</span>
         </div>
@@ -850,7 +870,7 @@ export class HeizplanCardV2 extends LitElement {
     const selectId = `room-select-${this._config.entity.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
     return html`
-      <div class="room-selector">
+      <div class="room-selector header-section">
         <label for=${selectId}>Room</label>
         <select id=${selectId} @change=${this._handleRoomChange}>
           ${this._availableRooms.map(
@@ -1013,7 +1033,7 @@ export class HeizplanCardV2 extends LitElement {
     const isHeatMode = entity.state === 'heat' || entity.state === 'auto';
 
     return html`
-      <div class="controls">
+      <div class="header-section header-controls">
         <div class="temp-control">
           <button class="temp-button decrease" @click=${this._decreaseTemperature}>−</button>
           <div class="temp-display">${entity.attributes.temperature || '--'}°C</div>
