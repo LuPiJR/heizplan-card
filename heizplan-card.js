@@ -133,6 +133,9 @@
       this._currentDay = this._getCurrentDay();
       this._currentView = 'single';
       this._editing = null; // {day, index, entry}
+      this._lastScheduledTemp = null;
+      this._activeScheduledTemp = null;
+      this._manualOverrideActive = false;
       this.attachShadow({mode:'open'}).appendChild(TEMPLATE.content.cloneNode(true));
 
       // Cache refs
@@ -182,6 +185,29 @@
       if (typeof raw === 'string' && raw.trim()) {
         try { this._schedule = this._parseTextSchedule(raw); }
         catch(e){ this._setError('Invalid schedule format in input_text'); }
+      }
+      const entity = this._entity();
+      if (entity) {
+        const tolerance = 0.1;
+        const prevScheduled = this._activeScheduledTemp;
+        const scheduledTemp = this._getActiveScheduledTemperature();
+        this._activeScheduledTemp = scheduledTemp;
+        if (scheduledTemp !== null && !Number.isNaN(scheduledTemp)) {
+          if (prevScheduled === null || Math.abs(scheduledTemp - prevScheduled) > tolerance) {
+            this._manualOverrideActive = false;
+          }
+          const entityTemp = Number(entity.attributes.temperature);
+          if (!Number.isNaN(entityTemp)) {
+            const alreadyRequested = this._lastScheduledTemp !== null && Math.abs(scheduledTemp - this._lastScheduledTemp) <= tolerance;
+            const needsSync = Math.abs(entityTemp - scheduledTemp) > tolerance && !this._manualOverrideActive && !alreadyRequested;
+            if (needsSync) {
+              this._setTemp(scheduledTemp, { fromSchedule: true });
+            } else if (Math.abs(entityTemp - scheduledTemp) <= tolerance) {
+              this._lastScheduledTemp = scheduledTemp;
+              this._manualOverrideActive = false;
+            }
+          }
+        }
       }
       this._render();
     }
@@ -244,7 +270,9 @@
       this.$.current.textContent = `${entity.attributes.current_temperature ?? '--'}°C`;
 
       // Controls
-      this.$.temp.textContent = `${entity.attributes.temperature ?? '--'}°C`;
+      const scheduledTemp = this._getActiveScheduledTemperature();
+      const controlTemp = scheduledTemp ?? entity.attributes.temperature;
+      this.$.temp.textContent = `${controlTemp ?? '--'}°C`;
       this.$.mode.textContent = entity.state || 'unknown';
       this.$.toggle.setAttribute('aria-pressed', String(entity.state === 'heat' || entity.state === 'auto'));
 
@@ -384,8 +412,16 @@
       this._setTemp(Number(stepped.toFixed(2)));
     }
 
-    _setTemp(value){
+    _setTemp(value, options = {}){
       if(!this._hass) return;
+      const fromSchedule = Boolean(options.fromSchedule);
+      if (fromSchedule) {
+        this._manualOverrideActive = false;
+        this._lastScheduledTemp = value;
+      } else {
+        this._manualOverrideActive = true;
+        this._lastScheduledTemp = value;
+      }
       this._hass.callService('climate','set_temperature',{ entity_id: this._config.entity, temperature: value })
         .catch(err => this._setError(`Failed to set temperature: ${err?.message || err}`));
     }
@@ -516,6 +552,21 @@
     // ----- Helpers -----
     _toMin(str){ const [h,m] = String(str).split(':').map(Number); return (h*60) + (m||0); }
     _toTime(min){ const h=Math.floor(min/60), m=min%60; const pad=n=>String(n).padStart(2,'0'); return `${pad(h)}:${pad(m)}`; }
+    _getActiveScheduledTemperature(now = new Date()){
+      const dayKey = this._getCurrentDay();
+      const blocks = this._schedule?.[dayKey];
+      if(!Array.isArray(blocks) || blocks.length === 0) return null;
+      const minutes = now.getHours()*60 + now.getMinutes();
+      for (const entry of blocks) {
+        const start = this._toMin(entry.start);
+        const stop = this._toMin(entry.stop);
+        if (minutes >= start && minutes < stop) {
+          const temp = Number(entry.temperature);
+          return Number.isNaN(temp) ? null : temp;
+        }
+      }
+      return null;
+    }
     _isNow(entry){ const n = new Date(); const cur = n.getHours()*60 + n.getMinutes(); const s = this._toMin(entry.start), e = this._toMin(entry.stop); return cur >= s && cur < e; }
     _entity(){ return this._hass?.states?.[this._config.entity]; }
 
