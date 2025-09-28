@@ -11,43 +11,230 @@
   TEMPLATE.innerHTML = /* html */ `
     <style>
       :host { display: block; }
-      .heizplan-card { background: var(--card-background-color, #1e1e1e); border-radius: var(--border-radius, 0.5rem); padding: 1rem; font-family: var(--primary-font-family, Arial, sans-serif); color: var(--primary-text-color, #fff); box-shadow: var(--card-box-shadow, 0 0.4rem 0.6rem rgba(0,0,0,.2)); }
-      .card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; font-size:1.1rem; font-weight:600; }
-      .current-temp { font-size:.95rem; color: var(--secondary-text-color, #aaa); }
+      .heizplan-card {
+        background: var(--card-background-color, #1e1e1e);
+        border-radius: var(--border-radius, 0.5rem);
+        padding: 0.75rem;
+        font-family: var(--primary-font-family, Arial, sans-serif);
+        color: var(--primary-text-color, #fff);
+        box-shadow: var(--card-box-shadow, 0 0.4rem 0.6rem rgba(0, 0, 0, 0.2));
+      }
 
-      .view-controls{ display:flex; justify-content:center; gap:.5rem; margin-bottom:1rem; }
-      .view-button{ padding:.5rem 1rem; border:1px solid var(--primary-color,#f39c12); background:transparent; color:var(--primary-color,#f39c12); border-radius:.375rem; cursor:pointer; transition:.2s; font-size:.9rem; }
-      .view-button:hover,.view-button.active{ background:var(--primary-color,#f39c12); color:#fff; }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-bottom: 0.75rem;
+      }
 
-      .time-markers, .week-markers{ display:flex; justify-content:space-between; margin-top:.5rem; font-size:.75rem; color:var(--secondary-text-color,#aaa); }
+      .header-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        min-width: 7.5rem;
+        flex: 1 1 9rem;
+      }
 
-      .timeline, .week-timeline { position:relative; height:2.2rem; background:var(--timeline-background,#2e2e2e); border-radius:.25rem; overflow:hidden; cursor:pointer; }
-      .week-day{ display:flex; align-items:center; gap:.5rem; min-height:2rem; }
-      .week-day-header{ width:2.25rem; font-size:.85rem; font-weight:600; text-align:center; color:var(--primary-text-color,#fff); }
-      .week-timeline{ flex:1; height:1.6rem; }
+      .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+      }
 
-      .time-block{ position:absolute; inset-block:0; display:flex; align-items:center; justify-content:center; font-size:.8rem; color:#fff; border-right:1px solid rgba(255,255,255,.08); transition:transform .15s ease,opacity .15s ease; }
-      .time-block:hover{ opacity:.9; transform:scale(1.02); z-index:1; }
+      .current-temp {
+        font-size: 0.85rem;
+        color: var(--secondary-text-color, #aaa);
+      }
+
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        flex: 1 1 auto;
+      }
+
+      .temp-control {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.35rem 0.5rem;
+        border-radius: 999px;
+      }
+
+      .temp-button {
+        background: var(--primary-color, #f39c12);
+        border: none;
+        border-radius: 999px;
+        width: 1.75rem;
+        height: 1.75rem;
+        color: #fff;
+        cursor: pointer;
+        font-size: 0.95rem;
+        display: grid;
+        place-items: center;
+      }
+
+      .temp-display {
+        font-weight: 700;
+        min-width: 3.2rem;
+        text-align: center;
+        font-size: 1rem;
+      }
+
+      .temp-display.is-override {
+        color: var(--primary-color, #f39c12);
+      }
+
+      .mode-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .mode-display {
+        font-size: 0.85rem;
+        color: var(--secondary-text-color, #aaa);
+        text-transform: capitalize;
+        cursor: pointer;
+        padding: 0.25rem 0.55rem;
+        border: 1px solid var(--secondary-text-color, #666);
+        border-radius: 0.35rem;
+        transition: 0.2s;
+      }
+
+      .mode-display:hover {
+        background: var(--primary-color, #f39c12);
+        color: #fff;
+        border-color: var(--primary-color, #f39c12);
+      }
+
+      .toggle-switch {
+        position: relative;
+        width: 64px;
+        height: 28px;
+        border-radius: 14px;
+        border: none;
+        background: #666;
+        cursor: pointer;
+        transition: all 0.3s;
+        overflow: hidden;
+      }
+
+      .toggle-switch[aria-pressed="true"] {
+        background: var(--primary-color, #f39c12);
+      }
+
+      .toggle-switch span {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #fff;
+        transition: opacity 0.3s;
+      }
+
+      .toggle-off { left: 8px; }
+      .toggle-on { right: 8px; opacity: 0; }
+
+      .toggle-switch[aria-pressed="true"] .toggle-off { opacity: 0; }
+      .toggle-switch[aria-pressed="true"] .toggle-on { opacity: 1; }
+
+      .view-controls {
+        display: flex;
+        justify-content: center;
+        gap: 0.4rem;
+        margin-bottom: 0.65rem;
+      }
+
+      .view-button {
+        padding: 0.3rem 0.7rem;
+        border: 1px solid var(--primary-color, #f39c12);
+        background: transparent;
+        color: var(--primary-color, #f39c12);
+        border-radius: 0.3rem;
+        cursor: pointer;
+        transition: 0.2s;
+        font-size: 0.85rem;
+      }
+
+      .view-button:hover,
+      .view-button.active {
+        background: var(--primary-color, #f39c12);
+        color: #fff;
+      }
+
+      .time-markers,
+      .week-markers {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.35rem;
+        font-size: 0.7rem;
+        color: var(--secondary-text-color, #aaa);
+      }
+
+      .timeline,
+      .week-timeline {
+        position: relative;
+        height: 1.65rem;
+        background: var(--timeline-background, #2e2e2e);
+        border-radius: 0.25rem;
+        overflow: hidden;
+        cursor: pointer;
+      }
+
+      .week-day {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 1.8rem;
+      }
+
+      .week-day-header {
+        width: 2rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-align: center;
+        color: var(--primary-text-color, #fff);
+      }
+
+      .week-timeline {
+        flex: 1;
+        height: 1.4rem;
+      }
+
+      .time-block {
+        position: absolute;
+        inset-block: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        color: #fff;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        transition: transform 0.15s ease, opacity 0.15s ease;
+      }
+
+      .time-block:hover {
+        opacity: 0.9;
+        transform: scale(1.02);
+        z-index: 1;
+      }
+
+      .time-block.override {
+        box-shadow: inset 0 0 0 2px var(--primary-color, #f39c12);
+      }
 
       /* Temperature -> color mapping via HSL so any °C works */
-      .time-block{ background: hsl(var(--_h, 18) calc(var(--_s, 80%)) calc(var(--_l, 44%))); }
-
-      .controls{ display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(255,255,255,.1); }
-      .temp-control{ display:flex; align-items:center; gap:.5rem; }
-      .temp-button{ background:var(--primary-color,#f39c12); border:none; border-radius:999px; width:2rem; height:2rem; color:#fff; cursor:pointer; font-size:1rem; display:grid; place-items:center; }
-      .temp-display{ font-weight:700; min-width:3rem; text-align:center; }
-
-      .mode-controls{ display:flex; flex-direction:column; align-items:center; gap:.5rem; }
-      .mode-display{ font-size:.9rem; color:var(--secondary-text-color,#aaa); text-transform:capitalize; cursor:pointer; padding:.3rem .6rem; border:1px solid var(--secondary-text-color,#aaa); border-radius:.25rem; transition:.2s; }
-      .mode-display:hover{ background:var(--primary-color,#f39c12); color:#fff; border-color:var(--primary-color,#f39c12); }
-
-      .toggle-switch{ position:relative; width:80px; height:32px; border-radius:16px; border:none; background:#666; cursor:pointer; transition:all .3s; overflow:hidden; }
-      .toggle-switch[aria-pressed="true"]{ background:var(--primary-color,#f39c12); }
-      .toggle-switch span{ position:absolute; top:50%; transform:translateY(-50%); font-size:.7rem; font-weight:700; color:#fff; transition:opacity .3s; }
-      .toggle-off{ left:8px; }
-      .toggle-on{ right:8px; opacity:0; }
-      .toggle-switch[aria-pressed="true"] .toggle-off{ opacity:0; }
-      .toggle-switch[aria-pressed="true"] .toggle-on{ opacity:1; }
+      .time-block {
+        background: hsl(var(--_h, 18) calc(var(--_s, 80%)) calc(var(--_l, 44%)));
+      }
 
       .error-message{ color:var(--error-color,#ff6b6b); font-size:.9rem; margin-top:.5rem; text-align:center; }
 
@@ -64,8 +251,24 @@
 
     <div class="heizplan-card" part="card">
       <div class="card-header">
-        <div class="card-title" part="title"></div>
-        <div class="current-temp" part="current"></div>
+        <div class="header-info">
+          <div class="card-title" part="title"></div>
+          <div class="current-temp" part="current"></div>
+        </div>
+        <div class="header-controls">
+          <div class="temp-control">
+            <button class="temp-button js-dec" aria-label="Decrease setpoint">−</button>
+            <div class="temp-display js-temp"></div>
+            <button class="temp-button js-inc" aria-label="Increase setpoint">+</button>
+          </div>
+          <div class="mode-controls">
+            <div class="mode-display js-mode" role="button" tabindex="0" aria-label="Cycle HVAC mode"></div>
+            <button class="toggle-switch js-toggle" role="switch" aria-pressed="false" aria-label="Toggle heat">
+              <span class="toggle-off">OFF</span>
+              <span class="toggle-on">HEAT</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="view-controls" role="tablist" aria-label="Schedule view">
@@ -83,21 +286,6 @@
         <div class="week-days"></div>
         <div class="week-markers time-markers"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span></div>
       </section>
-
-      <div class="controls">
-        <div class="temp-control">
-          <button class="temp-button js-dec" aria-label="Decrease setpoint">−</button>
-          <div class="temp-display js-temp"></div>
-          <button class="temp-button js-inc" aria-label="Increase setpoint">+</button>
-        </div>
-        <div class="mode-controls">
-          <div class="mode-display js-mode" role="button" tabindex="0" aria-label="Cycle HVAC mode"></div>
-          <button class="toggle-switch js-toggle" role="switch" aria-pressed="false" aria-label="Toggle heat">
-            <span class="toggle-off">OFF</span>
-            <span class="toggle-on">HEAT</span>
-          </button>
-        </div>
-      </div>
 
       <div class="error-message js-error" aria-live="polite"></div>
     </div>
@@ -136,6 +324,8 @@
       this._lastScheduledTemp = null;
       this._activeScheduledTemp = null;
       this._manualOverrideActive = false;
+      this._manualOverrideTemp = null;
+      this._manualOverride = null;
       this.attachShadow({mode:'open'}).appendChild(TEMPLATE.content.cloneNode(true));
 
       // Cache refs
@@ -192,9 +382,18 @@
         const prevScheduled = this._activeScheduledTemp;
         const scheduledTemp = this._getActiveScheduledTemperature();
         this._activeScheduledTemp = scheduledTemp;
+        const activeBlock = this._findActiveScheduleBlock();
+        if (this._manualOverrideActive && this._manualOverride) {
+          const stillSameBlock = this._manualOverride.index === -1
+            ? true
+            : Boolean(activeBlock && activeBlock.day === this._manualOverride.day && activeBlock.index === this._manualOverride.index);
+          if (!stillSameBlock) {
+            this._clearManualOverride();
+          }
+        }
         if (scheduledTemp !== null && !Number.isNaN(scheduledTemp)) {
           if (prevScheduled === null || Math.abs(scheduledTemp - prevScheduled) > tolerance) {
-            this._manualOverrideActive = false;
+            this._clearManualOverride();
           }
           const entityTemp = Number(entity.attributes.temperature);
           if (!Number.isNaN(entityTemp)) {
@@ -204,7 +403,7 @@
               this._setTemp(scheduledTemp, { fromSchedule: true });
             } else if (Math.abs(entityTemp - scheduledTemp) <= tolerance) {
               this._lastScheduledTemp = scheduledTemp;
-              this._manualOverrideActive = false;
+              this._clearManualOverride();
             }
           }
         }
@@ -271,8 +470,16 @@
 
       // Controls
       const scheduledTemp = this._getActiveScheduledTemperature();
-      const controlTemp = scheduledTemp ?? entity.attributes.temperature;
-      this.$.temp.textContent = `${controlTemp ?? '--'}°C`;
+      let controlTemp = entity.attributes.temperature;
+      if (this._manualOverrideActive && this._manualOverrideTemp !== null) {
+        controlTemp = this._manualOverrideTemp;
+      } else if (scheduledTemp !== null && scheduledTemp !== undefined) {
+        controlTemp = scheduledTemp;
+      }
+      const numericTemp = Number(controlTemp);
+      const displayTemp = Number.isFinite(numericTemp) ? numericTemp : '--';
+      this.$.temp.textContent = `${displayTemp}°C`;
+      this.$.temp.classList.toggle('is-override', this._manualOverrideActive);
       this.$.mode.textContent = entity.state || 'unknown';
       this.$.toggle.setAttribute('aria-pressed', String(entity.state === 'heat' || entity.state === 'auto'));
 
@@ -324,6 +531,7 @@
       }
       const total = 24*60;
       const frag = document.createDocumentFragment();
+      const override = this._manualOverride;
       entries.forEach((e, idx) => {
         const start = this._toMin(e.start), stop = this._toMin(e.stop);
         const w = Math.max(0, stop - start) / total * 100;
@@ -340,7 +548,13 @@
         const t = Number(e.temperature);
         const hue = 220 - Math.max(0, Math.min(1, (t - 5) / 20)) * 200;
         block.style.setProperty('--_h', hue.toFixed(0));
-        block.textContent = (stop - start) > 90 ? `${t}°C` : '';
+        const isOverrideBlock = Boolean(override && override.day === day && override.index === idx);
+        const rawTemp = isOverrideBlock && override ? override.temperature : t;
+        const displayTemp = Number.isFinite(Number(rawTemp)) ? Number(rawTemp) : '--';
+        block.classList.toggle('override', isOverrideBlock);
+        block.textContent = (stop - start) > 90 ? `${displayTemp}°C` : '';
+        block.title = `${e.start} - ${e.stop} • ${displayTemp}°C`;
+        block.setAttribute('aria-label', `${e.start} to ${e.stop} at ${displayTemp}°C`);
         frag.appendChild(block);
       });
       container.appendChild(frag);
@@ -397,7 +611,7 @@
       this._dispatchScheduleChange(day);
       this._closeModal();
       this._render();
-      if(this._isNow(entry)) this._setTemp(entry.temperature);
+      if(this._isNow(entry)) this._setTemp(entry.temperature, { fromSchedule: true });
     }
 
     _closeModal(){ this.$.modal.removeAttribute('open'); this._editing = null; }
@@ -405,7 +619,13 @@
     // ----- Controls -----
     _adjustTemp(delta){
       const entity = this._entity(); if(!entity) return;
-      const current = Number(entity.attributes.temperature ?? 20);
+      let current = this._manualOverrideActive && this._manualOverrideTemp !== null
+        ? Number(this._manualOverrideTemp)
+        : Number(entity.attributes.temperature);
+      if (Number.isNaN(current)) {
+        const scheduled = this._getActiveScheduledTemperature();
+        current = Number(!Number.isNaN(Number(scheduled)) ? scheduled : 20);
+      }
       const v = current + delta; const cfg = this._config;
       const clamped = Math.max(cfg.min_temp, Math.min(cfg.max_temp, Number((v).toFixed(2))));
       const stepped = Math.round(clamped / cfg.temp_step) * cfg.temp_step;
@@ -416,12 +636,20 @@
       if(!this._hass) return;
       const fromSchedule = Boolean(options.fromSchedule);
       if (fromSchedule) {
-        this._manualOverrideActive = false;
+        this._clearManualOverride();
         this._lastScheduledTemp = value;
       } else {
         this._manualOverrideActive = true;
+        this._manualOverrideTemp = value;
+        const activeBlock = this._findActiveScheduleBlock();
+        if (activeBlock) {
+          this._manualOverride = { ...activeBlock, temperature: value };
+        } else {
+          this._manualOverride = { day: this._getCurrentDay(), index: -1, temperature: value };
+        }
         this._lastScheduledTemp = value;
       }
+      this._render();
       this._hass.callService('climate','set_temperature',{ entity_id: this._config.entity, temperature: value })
         .catch(err => this._setError(`Failed to set temperature: ${err?.message || err}`));
     }
@@ -590,6 +818,28 @@
       ];
       const sun = [...sat];
       return { monday:[...base], tuesday:[...base], wednesday:[...base], thursday:[...base], friday:[...base], saturday:sat, sunday:sun };
+    }
+
+    _findActiveScheduleBlock(now = new Date()){
+      const day = this._getCurrentDay();
+      const entries = this._schedule?.[day];
+      if(!Array.isArray(entries)) return null;
+      const minutes = now.getHours()*60 + now.getMinutes();
+      for (let index = 0; index < entries.length; index++) {
+        const entry = entries[index];
+        const start = this._toMin(entry.start);
+        const stop = this._toMin(entry.stop);
+        if (minutes >= start && minutes < stop) {
+          return { day, index };
+        }
+      }
+      return null;
+    }
+
+    _clearManualOverride(){
+      this._manualOverrideActive = false;
+      this._manualOverrideTemp = null;
+      this._manualOverride = null;
     }
 
     _switchView(view){ if(view !== 'single' && view !== 'week') return; this._currentView = view; this._render(); }
