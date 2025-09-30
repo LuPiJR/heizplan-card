@@ -487,10 +487,12 @@
           const entityTemp = Number(entity.attributes.temperature);
           if (!Number.isNaN(entityTemp)) {
             const alreadyRequested = this._lastScheduledTemp !== null && Math.abs(scheduledTemp - this._lastScheduledTemp) <= tolerance;
-            const needsSync = Math.abs(entityTemp - scheduledTemp) > tolerance && !this._manualOverrideActive && !alreadyRequested;
-            if (needsSync) {
-              this._setTemp(scheduledTemp, { fromSchedule: true });
-            } else if (Math.abs(entityTemp - scheduledTemp) <= tolerance) {
+            const deviation = Math.abs(entityTemp - scheduledTemp);
+            if (deviation > tolerance) {
+              if (!this._manualOverrideActive && !alreadyRequested) {
+                this._adoptExternalOverride(entityTemp, activeBlock);
+              }
+            } else {
               this._lastScheduledTemp = scheduledTemp;
               this._clearManualOverride();
             }
@@ -758,6 +760,16 @@
       this._render();
       this._hass.callService('climate','set_temperature',{ entity_id: this._config.entity, temperature: value })
         .catch(err => this._setError(`Failed to set temperature: ${err?.message || err}`));
+    }
+
+    _adoptExternalOverride(value, activeBlock){
+      this._manualOverrideActive = true;
+      this._manualOverrideTemp = value;
+      if (activeBlock) {
+        this._manualOverride = { ...activeBlock, temperature: value };
+      } else {
+        this._manualOverride = { day: this._getCurrentDay(), index: -1, temperature: value };
+      }
     }
 
     _toggleHeat(){
