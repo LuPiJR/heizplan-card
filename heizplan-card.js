@@ -44,7 +44,7 @@
       }
 
       .current-temp {
-        font-size: 0.85rem;
+        font-size: 1.5rem;
         color: var(--secondary-text-color, #aaa);
       }
 
@@ -97,7 +97,7 @@
         display: flex;
         align-items: center;
         gap: 0.4rem;
-        background: rgba(255, 0, 0, 0.41);
+        background: #AEAEAE69;
         padding: 0.35rem 0.5rem;
         border-radius: 999px;
       }
