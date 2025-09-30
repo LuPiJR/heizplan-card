@@ -108,9 +108,12 @@ schedule_text_entity: input_text.heizplan_schedule
 min_temp: 5
 max_temp: 30
 temp_step: 0.5
+fallback_temp: 5
 ```
 
 > The vanilla JavaScript card stores its schedule in a single `input_text` helper referenced by `schedule_text_entity`. It does not accept `room_temp_key` or persistence blocks.
+
+`fallback_temp` controls the baseline temperature that seeds each day's schedule during parsing and when the default template is generated. Adjust it if you prefer a different "away" temperature than the built-in 5 °C.
 
 #### LitElement Card (`custom:heizplan-card-v2`)
 
