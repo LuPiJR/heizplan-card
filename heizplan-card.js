@@ -370,7 +370,16 @@
   `;
 
   const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-  const DAY_SHORT = { monday: 'Mo', tuesday: 'Di', wednesday: 'Mi', thursday: 'Do', friday: 'Fr', saturday: 'Sa', sunday: 'So' };
+  const DAY_NAMES = {
+    monday:   { long: 'Montag',    short: 'Mo' },
+    tuesday:  { long: 'Dienstag',  short: 'Di' },
+    wednesday:{ long: 'Mittwoch',  short: 'Mi' },
+    thursday: { long: 'Donnerstag',short: 'Do' },
+    friday:   { long: 'Freitag',   short: 'Fr' },
+    saturday: { long: 'Samstag',   short: 'Sa' },
+    sunday:   { long: 'Sonntag',   short: 'So' }
+  };
+  const DAY_SHORT = Object.fromEntries(Object.entries(DAY_NAMES).map(([key, value]) => [key, value.short]));
 
   class HeizplanCard extends HTMLElement {
     // ----- Lifecycle -----
@@ -573,7 +582,8 @@
 
     _renderSingleDay(){
       const day = this._currentDay;
-      this.$.dayHeader.textContent = day[0].toUpperCase() + day.slice(1);
+      const label = DAY_NAMES[day]?.long ?? day[0].toUpperCase() + day.slice(1);
+      this.$.dayHeader.textContent = label;
       this.$.timeline.dataset.day = day;
       this._fillTimeline(this.$.timeline, this._schedule[day] || [], day);
     }
