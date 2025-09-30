@@ -442,6 +442,7 @@
     // ----- HA integration -----
     setConfig(config){
       if(!config?.entity) throw new Error('Please define a thermostat entity');
+      const fallback = Number(config.fallback_temp ?? 5);
       this._config = {
         name: config.name || 'Heizplan',
         min_temp: Number(config.min_temp ?? 5),
@@ -450,6 +451,7 @@
         entity: config.entity,
         schedule_text_entity: config.schedule_text_entity, // single source of truth
         battery_entity: config.battery_entity, // optional battery sensor
+        fallback_temp: Number.isFinite(fallback) ? fallback : 5,
       };
       this._schedule = this._defaultSchedule(); // until hass() loads input_text
       this._render();
@@ -499,7 +501,7 @@
     }
 
     getCardSize(){ return 3; }
-    static getStubConfig(){ return { entity:'climate.thermostat', name:'Heizplan' }; }
+    static getStubConfig(){ return { entity:'climate.thermostat', name:'Heizplan', fallback_temp:5 }; }
 
     // ----- Events -----
     _bindEvents(){
@@ -805,7 +807,8 @@
       }
 
       const idxToDay = i => DAYS[(i-1+7)%7]; // 1=Mon..7=Sun
-      let lastTemp = 5;
+      const fallback = Number.isFinite(this._config?.fallback_temp) ? this._config.fallback_temp : 5;
+      let lastTemp = fallback;
       for (let i=1; i<=7; i++) {
         const changes = dayChanges[i].sort((a,b)=> toMin(a.time)-toMin(b.time));
         let cursor = 0, current = lastTemp; const segs = [];
@@ -896,20 +899,21 @@
     _getCurrentDay(){ return DAYS[(new Date().getDay()+6)%7]; /* convert Sun=0 to Sunday last */ }
 
     _defaultSchedule(){
+      const fallback = Number.isFinite(this._config?.fallback_temp) ? this._config.fallback_temp : 5;
       const base = [
-        { start:'00:00', stop:'07:00', temperature:5 },
+        { start:'00:00', stop:'07:00', temperature:fallback },
         { start:'07:00', stop:'09:30', temperature:21 },
         { start:'09:30', stop:'14:30', temperature:21 },
         { start:'14:30', stop:'21:00', temperature:21 },
         { start:'21:00', stop:'23:00', temperature:21.5 },
-        { start:'23:00', stop:'24:00', temperature:5 },
+        { start:'23:00', stop:'24:00', temperature:fallback },
       ];
       const sat = [
-        { start:'00:00', stop:'07:30', temperature:5 },
+        { start:'00:00', stop:'07:30', temperature:fallback },
         { start:'07:30', stop:'10:30', temperature:21 },
         { start:'10:30', stop:'19:00', temperature:21 },
         { start:'19:00', stop:'23:00', temperature:21.5 },
-        { start:'23:00', stop:'24:00', temperature:5 },
+        { start:'23:00', stop:'24:00', temperature:fallback },
       ];
       const sun = [...sat];
       return { monday:[...base], tuesday:[...base], wednesday:[...base], thursday:[...base], friday:[...base], saturday:sat, sunday:sun };
