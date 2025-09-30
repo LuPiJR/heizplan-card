@@ -380,6 +380,19 @@
     saturday: { long: 'Samstag',   short: 'Sa' },
     sunday:   { long: 'Sonntag',   short: 'So' }
   };
+
+  // Drop this near the top of the file
+  const TIMELINE_COLORS = [
+    { limit: 10, color: '#0949C8' },
+    { limit: 16, color: '#276CF5' }, // 16 °C and below
+    { limit: 18, color: '#F5B027' },
+    { limit: 19, color: '#F4A60B' },
+    { limit: 20, color: '#F54927' },
+    { limit: 21, color: '#F4320B' },
+    { limit: 22, color: '#C82909' },
+    { limit: 24, color: '#9C2007' },
+    { limit: Infinity, color: '#701705' }, // everything hotter
+  ];
   const DAY_SHORT = Object.fromEntries(Object.entries(DAY_NAMES).map(([key, value]) => [key, value.short]));
 
   class HeizplanCard extends HTMLElement {
@@ -614,10 +627,12 @@
       const total = 24*60;
       const frag = document.createDocumentFragment();
       const override = this._manualOverride;
+
       entries.forEach((e, idx) => {
         const start = this._toMin(e.start), stop = this._toMin(e.stop);
         const w = Math.max(0, stop - start) / total * 100;
         const l = start / total * 100;
+
         const block = document.createElement('div');
         block.className = 'time-block';
         block.style.width = w + '%';
@@ -626,10 +641,14 @@
         block.setAttribute('role', 'button');
         block.dataset.index = String(idx);
         block.dataset.day = day;
-        // map temp to hue (5°C blue -> 25°C red)
+
+        // --- new: choose color band instead of hue/--_h ---
         const t = Number(e.temperature);
-        const hue = 220 - Math.max(0, Math.min(1, (t - 5) / 20)) * 200;
-        block.style.setProperty('--_h', hue.toFixed(0));
+        const band = TIMELINE_COLORS.find(entry => t <= entry.limit) ?? TIMELINE_COLORS.at(-1);
+        if (band) block.style.background = band.color;
+        block.style.removeProperty('--_h');
+        // ---------------------------------------------------
+
         const isOverrideBlock = Boolean(override && override.day === day && override.index === idx);
         const rawTemp = isOverrideBlock && override ? override.temperature : t;
         const displayTemp = Number.isFinite(Number(rawTemp)) ? Number(rawTemp) : '--';
@@ -637,8 +656,10 @@
         block.textContent = (stop - start) > 90 ? `${displayTemp}°C` : '';
         block.title = `${e.start} - ${e.stop} • ${displayTemp}°C`;
         block.setAttribute('aria-label', `${e.start} to ${e.stop} at ${displayTemp}°C`);
+
         frag.appendChild(block);
       });
+
       container.appendChild(frag);
     }
 
