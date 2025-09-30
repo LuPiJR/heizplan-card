@@ -26,7 +26,7 @@
 
       .card-header {
         display: flex;
-        align-items: center;
+        /*align-items: center;*/
         justify-content: space-between;
         margin-bottom: 0.5rem;
       }
@@ -50,8 +50,9 @@
 
       .header-controls {
         display: flex;
-        align-items: center;
+        align-items: flex-end;
         gap: 0.5rem;
+        padding-bottom: 3px;
       }
 
       .status-bar {
@@ -98,7 +99,7 @@
         align-items: center;
         gap: 0.4rem;
         background: #AEAEAE69;
-        padding: 0.35rem 0.5rem;
+        padding: 0.2rem 0.2rem;
         border-radius: 999px;
       }
 
@@ -804,7 +805,7 @@
       }
 
       const idxToDay = i => DAYS[(i-1+7)%7]; // 1=Mon..7=Sun
-      let lastTemp = 17;
+      let lastTemp = 5;
       for (let i=1; i<=7; i++) {
         const changes = dayChanges[i].sort((a,b)=> toMin(a.time)-toMin(b.time));
         let cursor = 0, current = lastTemp; const segs = [];
