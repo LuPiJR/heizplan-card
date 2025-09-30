@@ -52,7 +52,7 @@
         display: flex;
         align-items: flex-end;
         gap: 0.5rem;
-        padding-bottom: 3px;
+        padding-bottom: 2px;
       }
 
       .status-bar {
@@ -117,7 +117,6 @@
       }
 
       .temp-display {
-        font-weight: 700;
         min-width: 3.2rem;
         text-align: center;
         font-size: 1rem;
