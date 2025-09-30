@@ -10,7 +10,11 @@
   const TEMPLATE = document.createElement('template');
   TEMPLATE.innerHTML = /* html */ `
     <style>
-      :host { display: block; }
+      :host {
+        display: block;
+        --week-day-label-width: 2rem;
+        --week-day-gap: 0.45rem;
+      }
       .heizplan-card {
         background: var(--card-background-color, #1e1e1e);
         border-radius: var(--border-radius, 0.5rem);
@@ -224,6 +228,10 @@
         color: var(--secondary-text-color, #aaa);
       }
 
+      .week-markers {
+        padding-inline-start: calc(var(--week-day-label-width, 2rem) + var(--week-day-gap, 0.45rem));
+      }
+
       .timeline,
       .week-timeline {
         position: relative;
@@ -237,12 +245,12 @@
       .week-day {
         display: flex;
         align-items: center;
-        gap: 0.45rem;
+        gap: var(--week-day-gap, 0.45rem);
         min-height: 1.8rem;
       }
 
       .week-day-header {
-        width: 2rem;
+        width: var(--week-day-label-width, 2rem);
         font-size: 0.75rem;
         font-weight: 600;
         text-align: center;
