@@ -411,6 +411,7 @@
       this._manualOverrideActive = false;
       this._manualOverrideTemp = null;
       this._manualOverride = null;
+      this._pendingScheduledTemp = null;
       this.attachShadow({mode:'open'}).appendChild(TEMPLATE.content.cloneNode(true));
 
       // Cache refs
@@ -486,10 +487,13 @@
           }
           const entityTemp = Number(entity.attributes.temperature);
           if (!Number.isNaN(entityTemp)) {
-            const alreadyRequested = this._lastScheduledTemp !== null && Math.abs(scheduledTemp - this._lastScheduledTemp) <= tolerance;
+            if (this._pendingScheduledTemp !== null && Math.abs(entityTemp - this._pendingScheduledTemp) <= tolerance) {
+              this._pendingScheduledTemp = null;
+            }
+            const scheduleCommandPending = this._pendingScheduledTemp !== null;
             const deviation = Math.abs(entityTemp - scheduledTemp);
             if (deviation > tolerance) {
-              if (!this._manualOverrideActive && !alreadyRequested) {
+              if (!this._manualOverrideActive && !scheduleCommandPending) {
                 this._adoptExternalOverride(entityTemp, activeBlock);
               }
             } else {
@@ -746,6 +750,7 @@
       if (fromSchedule) {
         this._clearManualOverride();
         this._lastScheduledTemp = value;
+        this._pendingScheduledTemp = value;
       } else {
         this._manualOverrideActive = true;
         this._manualOverrideTemp = value;
@@ -756,6 +761,7 @@
           this._manualOverride = { day: this._getCurrentDay(), index: -1, temperature: value };
         }
         this._lastScheduledTemp = value;
+        this._pendingScheduledTemp = null;
       }
       this._render();
       this._hass.callService('climate','set_temperature',{ entity_id: this._config.entity, temperature: value })
@@ -770,6 +776,7 @@
       } else {
         this._manualOverride = { day: this._getCurrentDay(), index: -1, temperature: value };
       }
+      this._pendingScheduledTemp = null;
     }
 
     _toggleHeat(){
