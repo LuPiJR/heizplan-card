@@ -57,6 +57,16 @@ interface PersistenceConfig {
   data?: Record<string, unknown>;
 }
 
+const DAY_LABELS: Record<string, { long: string; short: string }> = {
+  monday: { long: 'Montag', short: 'Mo' },
+  tuesday: { long: 'Dienstag', short: 'Di' },
+  wednesday: { long: 'Mittwoch', short: 'Mi' },
+  thursday: { long: 'Donnerstag', short: 'Do' },
+  friday: { long: 'Freitag', short: 'Fr' },
+  saturday: { long: 'Samstag', short: 'Sa' },
+  sunday: { long: 'Sonntag', short: 'So' }
+};
+
 @customElement('heizplan-card-v2')
 export class HeizplanCardV2 extends LitElement {
   private _hass?: HomeAssistant;
@@ -734,16 +744,11 @@ export class HeizplanCardV2 extends LitElement {
   }
 
   private _formatDayLabel(day: string, short = false): string {
-    const date = new Date();
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const index = days.indexOf(day.toLowerCase());
+    const key = day.toLowerCase();
+    const labels = DAY_LABELS[key];
 
-    if (index !== -1) {
-      const baseDate = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay() + index);
-      const formatter = new Intl.DateTimeFormat(this._hass?.locale?.language ?? undefined, {
-        weekday: short ? 'short' : 'long'
-      });
-      return formatter.format(baseDate);
+    if (labels) {
+      return short ? labels.short : labels.long;
     }
 
     const normalized = day.charAt(0).toUpperCase() + day.slice(1);
