@@ -481,8 +481,12 @@
           }
         }
         if (scheduledTemp !== null && !Number.isNaN(scheduledTemp)) {
-          if (prevScheduled === null || Math.abs(scheduledTemp - prevScheduled) > tolerance) {
+          const scheduledChanged = prevScheduled !== null && Math.abs(scheduledTemp - prevScheduled) > tolerance;
+          if (prevScheduled === null || scheduledChanged) {
             this._clearManualOverride();
+          }
+          if (scheduledChanged && !this._manualOverrideActive && this._pendingScheduledTemp === null) {
+            this._setTemp(scheduledTemp, { fromSchedule: true });
           }
           const entityTemp = Number(entity.attributes.temperature);
           if (!Number.isNaN(entityTemp)) {
