@@ -411,6 +411,8 @@
       this._manualOverrideTemp = null;
       this._manualOverride = null;
       this._pendingScheduledTemp = null;
+      this._currentScheduleBlockKey = null;
+      this._scheduleTimer = null;
       this.attachShadow({mode:'open'}).appendChild(TEMPLATE.content.cloneNode(true));
 
       // Cache refs
@@ -433,10 +435,11 @@
       };
     }
 
-    connectedCallback(){ this._bindEvents(); this._render(); }
+    connectedCallback(){ this._bindEvents(); this._startScheduleTimer(); this._render(); }
     disconnectedCallback(){
       this.shadowRoot.removeEventListener('click', this._onClick);
       this.shadowRoot.removeEventListener('keydown', this._onKeyDown);
+      this._stopScheduleTimer();
     }
 
     // ----- HA integration -----
@@ -454,6 +457,12 @@
         fallback_temp: Number.isFinite(fallback) ? fallback : 5,
       };
       this._schedule = this._defaultSchedule(); // until hass() loads input_text
+      this._manualOverrideActive = false;
+      this._manualOverrideTemp = null;
+      this._manualOverride = null;
+      this._pendingScheduledTemp = null;
+      this._activeScheduledTemp = null;
+      this._currentScheduleBlockKey = null;
       this._render();
     }
 
@@ -465,48 +474,82 @@
         try { this._schedule = this._parseTextSchedule(raw); }
         catch(e){ this._setError('Invalid schedule format in input_text'); }
       }
+      this._syncSchedule({ reason: 'hass-update' });
+      this._render();
+    }
+
+    _startScheduleTimer(){
+      if (this._scheduleTimer) return;
+      const tick = () => {
+        if (!this._hass) return;
+        this._syncSchedule({ reason: 'timer' });
+        this._render();
+      };
+      this._scheduleTimer = window.setInterval(tick, 30000);
+      tick();
+    }
+
+    _stopScheduleTimer(){
+      if (!this._scheduleTimer) return;
+      window.clearInterval(this._scheduleTimer);
+      this._scheduleTimer = null;
+    }
+
+    _syncSchedule({ reason = 'tick', now = new Date() } = {}){
       const entity = this._entity();
-      if (entity) {
-        const tolerance = 0.1;
-        const prevScheduled = this._activeScheduledTemp;
-        const scheduledTemp = this._getActiveScheduledTemperature();
-        this._activeScheduledTemp = scheduledTemp;
-        const activeBlock = this._findActiveScheduleBlock();
-        if (this._manualOverrideActive && this._manualOverride) {
-          const stillSameBlock = this._manualOverride.index === -1
-            ? true
-            : Boolean(activeBlock && activeBlock.day === this._manualOverride.day && activeBlock.index === this._manualOverride.index);
-          if (!stillSameBlock) {
-            this._clearManualOverride();
-          }
-        }
-        if (scheduledTemp !== null && !Number.isNaN(scheduledTemp)) {
-          const scheduledChanged = prevScheduled !== null && Math.abs(scheduledTemp - prevScheduled) > tolerance;
-          if (prevScheduled === null || scheduledChanged) {
-            this._clearManualOverride();
-          }
-          if (scheduledChanged && !this._manualOverrideActive && this._pendingScheduledTemp === null) {
-            this._setTemp(scheduledTemp, { fromSchedule: true });
-          }
-          const entityTemp = Number(entity.attributes.temperature);
-          if (!Number.isNaN(entityTemp)) {
-            if (this._pendingScheduledTemp !== null && Math.abs(entityTemp - this._pendingScheduledTemp) <= tolerance) {
-              this._pendingScheduledTemp = null;
-            }
-            const scheduleCommandPending = this._pendingScheduledTemp !== null;
-            const deviation = Math.abs(entityTemp - scheduledTemp);
-            if (deviation > tolerance) {
-              if (!this._manualOverrideActive && !scheduleCommandPending) {
-                this._adoptExternalOverride(entityTemp, activeBlock);
-              }
-            } else {
-              this._lastScheduledTemp = scheduledTemp;
-              this._clearManualOverride();
-            }
-          }
+      if (!entity) return;
+
+      const tolerance = 0.1;
+      const activeBlock = this._findActiveScheduleBlock(now);
+      const blockKey = this._scheduleBlockKey(activeBlock);
+      const prevBlockKey = this._currentScheduleBlockKey;
+      this._currentScheduleBlockKey = blockKey;
+      const blockChanged = prevBlockKey !== null && blockKey !== prevBlockKey;
+
+      if (this._manualOverrideActive && this._manualOverride) {
+        const stillSameBlock = this._manualOverride.index === -1
+          ? Boolean(activeBlock)
+          : Boolean(activeBlock && activeBlock.day === this._manualOverride.day && activeBlock.index === this._manualOverride.index);
+        if (!stillSameBlock) {
+          this._clearManualOverride();
         }
       }
-      this._render();
+
+      const prevScheduled = this._activeScheduledTemp;
+      const scheduledTemp = this._getActiveScheduledTemperature(now);
+      this._activeScheduledTemp = scheduledTemp;
+
+      const scheduledChanged = prevScheduled !== null && scheduledTemp !== null
+        ? Math.abs(scheduledTemp - prevScheduled) > tolerance
+        : false;
+
+      const shouldForceSchedule = scheduledTemp !== null && (
+        blockChanged || (!this._manualOverrideActive && scheduledChanged)
+      );
+
+      if (shouldForceSchedule) {
+        const pendingMatches = this._pendingScheduledTemp !== null && Math.abs(this._pendingScheduledTemp - scheduledTemp) <= tolerance;
+        if (!pendingMatches) {
+          this._setTemp(scheduledTemp, { fromSchedule: true, reason });
+        }
+      }
+
+      const entityTemp = Number(entity.attributes.temperature);
+      if (!Number.isNaN(entityTemp) && scheduledTemp !== null) {
+        if (this._pendingScheduledTemp !== null && Math.abs(entityTemp - this._pendingScheduledTemp) <= tolerance) {
+          this._pendingScheduledTemp = null;
+        }
+        const scheduleCommandPending = this._pendingScheduledTemp !== null;
+        const deviation = Math.abs(entityTemp - scheduledTemp);
+        if (deviation > tolerance) {
+          if (!this._manualOverrideActive && !scheduleCommandPending) {
+            this._adoptExternalOverride(entityTemp, activeBlock);
+          }
+        } else {
+          this._lastScheduledTemp = scheduledTemp;
+          this._clearManualOverride();
+        }
+      }
     }
 
     getCardSize(){ return 3; }
@@ -898,6 +941,10 @@
     }
 
     // ----- Helpers -----
+    _scheduleBlockKey(block){
+      if (!block) return null;
+      return `${block.day}:${block.index}`;
+    }
     _toMin(str){ const [h,m] = String(str).split(':').map(Number); return (h*60) + (m||0); }
     _toTime(min){ const h=Math.floor(min/60), m=min%60; const pad=n=>String(n).padStart(2,'0'); return `${pad(h)}:${pad(m)}`; }
     _getActiveScheduledTemperature(now = new Date()){
