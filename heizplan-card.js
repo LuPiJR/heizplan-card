@@ -393,6 +393,7 @@
     { limit: 24, color: '#9C2007' },
     { limit: Infinity, color: '#701705' }, // everything hotter
   ];
+  const SCHEDULE_PENDING_RETRY_MS = 60000; // retry schedule transitions after 60s if not applied
   const DAY_SHORT = Object.fromEntries(Object.entries(DAY_NAMES).map(([key, value]) => [key, value.short]));
 
   class HeizplanCard extends HTMLElement {
@@ -411,6 +412,7 @@
       this._manualOverrideTemp = null;
       this._manualOverride = null;
       this._pendingScheduledTemp = null;
+      this._pendingScheduledTempAt = null;
       this._currentScheduleBlockKey = null;
       this._scheduleTimer = null;
       this.attachShadow({mode:'open'}).appendChild(TEMPLATE.content.cloneNode(true));
@@ -461,6 +463,7 @@
       this._manualOverrideTemp = null;
       this._manualOverride = null;
       this._pendingScheduledTemp = null;
+      this._pendingScheduledTempAt = null;
       this._activeScheduledTemp = null;
       this._currentScheduleBlockKey = null;
       this._render();
@@ -500,16 +503,20 @@
       if (!entity) return;
 
       const tolerance = 0.1;
+      const nowTs = now instanceof Date && !Number.isNaN(now.getTime()) ? now.getTime() : Date.now();
       const activeBlock = this._findActiveScheduleBlock(now);
       const blockKey = this._scheduleBlockKey(activeBlock);
       const prevBlockKey = this._currentScheduleBlockKey;
       this._currentScheduleBlockKey = blockKey;
-      const blockChanged = prevBlockKey !== null && blockKey !== prevBlockKey;
+      const blockChanged = prevBlockKey !== null && blockKey !== null && blockKey !== prevBlockKey;
 
       if (this._manualOverrideActive && this._manualOverride) {
-        const stillSameBlock = this._manualOverride.index === -1
-          ? Boolean(activeBlock)
-          : Boolean(activeBlock && activeBlock.day === this._manualOverride.day && activeBlock.index === this._manualOverride.index);
+        const stillSameBlock = Boolean(
+          activeBlock &&
+          this._manualOverride.index >= 0 &&
+          activeBlock.day === this._manualOverride.day &&
+          activeBlock.index === this._manualOverride.index
+        );
         if (!stillSameBlock) {
           this._clearManualOverride();
         }
@@ -529,7 +536,8 @@
 
       if (shouldForceSchedule) {
         const pendingMatches = this._pendingScheduledTemp !== null && Math.abs(this._pendingScheduledTemp - scheduledTemp) <= tolerance;
-        if (!pendingMatches) {
+        const pendingFresh = pendingMatches && this._pendingScheduledTempAt !== null && (nowTs - this._pendingScheduledTempAt) < SCHEDULE_PENDING_RETRY_MS;
+        if (!pendingFresh) {
           this._setTemp(scheduledTemp, { fromSchedule: true, reason });
         }
       }
@@ -538,8 +546,14 @@
       if (!Number.isNaN(entityTemp) && scheduledTemp !== null) {
         if (this._pendingScheduledTemp !== null && Math.abs(entityTemp - this._pendingScheduledTemp) <= tolerance) {
           this._pendingScheduledTemp = null;
+          this._pendingScheduledTempAt = null;
         }
-        const scheduleCommandPending = this._pendingScheduledTemp !== null;
+        let scheduleCommandPending = this._pendingScheduledTemp !== null;
+        if (scheduleCommandPending && this._pendingScheduledTempAt !== null && (nowTs - this._pendingScheduledTempAt) >= SCHEDULE_PENDING_RETRY_MS) {
+          this._pendingScheduledTemp = null;
+          this._pendingScheduledTempAt = null;
+          scheduleCommandPending = false;
+        }
         const deviation = Math.abs(entityTemp - scheduledTemp);
         if (deviation > tolerance) {
           if (!this._manualOverrideActive && !scheduleCommandPending) {
@@ -797,6 +811,7 @@
         this._clearManualOverride();
         this._lastScheduledTemp = value;
         this._pendingScheduledTemp = value;
+        this._pendingScheduledTempAt = Date.now();
       } else {
         this._manualOverrideActive = true;
         this._manualOverrideTemp = value;
@@ -808,6 +823,7 @@
         }
         this._lastScheduledTemp = value;
         this._pendingScheduledTemp = null;
+        this._pendingScheduledTempAt = null;
       }
       this._render();
       this._hass.callService('climate','set_temperature',{ entity_id: this._config.entity, temperature: value })
@@ -823,6 +839,7 @@
         this._manualOverride = { day: this._getCurrentDay(), index: -1, temperature: value };
       }
       this._pendingScheduledTemp = null;
+      this._pendingScheduledTempAt = null;
     }
 
     _toggleHeat(){
